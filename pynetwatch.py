@@ -1,0 +1,255 @@
+import requests
+import time
+import threading
+import queue
+import tkinter as tk
+from tkinter import ttk, messagebox
+import pyttsx3
+from icmplib import ping as icmp_ping
+from ipaddress import ip_address, IPv6Address
+from collections import defaultdict
+import json
+from pathlib import Path
+from typing import Optional
+
+class Config:
+    def __init__(self):
+        self.speech_speed=140
+        self.interval=10
+        self.ping_count=2
+        self.ping_timeout=1
+        self.http_timeout=3
+        
+    def load_config_from_json(
+            self,
+            filename:str="config.json"):
+        try:
+            file_path = Path(filename)
+            if not file_path.exists():
+                raise FileNotFoundError(f"Fichier {filename} introuvable")
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            for item in data:
+                if 'name' not in item:
+                    print(f"Erreur: Entrée invalide dans le JSON - clé 'name' manquante: {item}")
+                    continue
+                    
+                devices.append(Device(
+                    name=item['name'],
+                    ip=item.get('ip'),
+                    url=item.get('url'),
+                    is_important=item.get('is_important', False)
+                ))
+                
+            return devices
+        
+        except json.JSONDecodeError as e:
+            print(f"Erreur de parsing JSON: {e}")
+            return []
+        except Exception as e:
+            print(f"Erreur de chargement: {str(e)}")
+            return []
+
+
+class Device:
+    def __init__(
+        self,
+        name: str,
+        ip: Optional[str] = None,
+        url: Optional[str] = None,
+        is_important: bool = False
+    ):
+        self.name: str = name
+        self.ip: Optional[str] = ip
+        self.url: Optional[str] = url
+        self.is_important: bool = is_important
+        
+
+class DeviceMonitor:
+    def __init__(self, device: Device):
+        self.device: Device = device
+        self.last_status: Optional[bool] = None
+        self.downtime_start: Optional[float] = None  # Type float pour les timestamps
+        self.current_status: Optional[bool] = True
+
+class NetworkMonitorApp(tk.Tk):
+    def __init__(self, device_monitors, alert_queue, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.title("Network Monitor")
+        self.alert_queue = alert_queue
+        self.device_monitors = device_monitors
+        
+        # Configuration de l'interface
+        self.tree = ttk.Treeview(self, columns=('Status', 'Downtime'), show='headings')
+        self.tree.heading('Status', text='Statut')
+        self.tree.heading('Downtime', text='Indisponible depuis')
+        self.tree.pack(fill=tk.BOTH, expand=True)
+        
+        self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
+        self.status_label.pack()
+        
+        self.update_interval = 1000
+        self.update_display()
+    
+    def update_display(self):
+        try:
+            alert_data = self.alert_queue.get_nowait()
+            self.process_alert(alert_data)
+        except queue.Empty:
+            pass
+        
+        self.tree.delete(*self.tree.get_children())
+        any_down = False
+        
+        for monitor in self.device_monitors.values():
+            if monitor.current_status is False:
+                any_down = True
+                downtime = time.strftime("%H:%M:%S", time.localtime(monitor.downtime_start)) if monitor.downtime_start else "N/A"
+                self.tree.insert('', 'end', values=(monitor.device.name, downtime))
+        
+        if any_down:
+            self.status_label.config(text="Problèmes détectés", foreground="red")
+        else:
+            self.status_label.config(text="Tout est joignable", foreground="green")
+        
+        self.after(self.update_interval, self.update_display)
+    
+    def process_alert(self, alert_data):
+        if alert_data['type'] == 'status_change':
+            device_name = alert_data['device']
+            monitor = self.device_monitors[device_name]
+            if not alert_data['status']:
+                monitor.downtime_start = time.time()
+            else:
+                monitor.downtime_start = None
+
+def check_ping(host, count=1, timeout=1):
+    try:
+        result = icmp_ping(host, count=count, timeout=timeout, privileged=False)
+        return result.packets_received > 0
+    except Exception:
+        return False
+
+def check_url(url, timeout=5):
+    try:
+        response = requests.get(url, timeout=timeout, verify=False)
+        return response.status_code <500
+    except requests.exceptions.RequestException:
+        return False
+
+def monitor(device_monitors, alert_queue, interval, ping_count, ping_timeout, http_timeout,speech_speed):
+    engine = pyttsx3.init()
+    engine.setProperty('rate',speech_speed)
+    last_global_status = None
+    
+    while True:
+        start_time = time.time()
+        status_changes = []
+        current_down = []
+        
+        for monitor in device_monitors.values():
+            previous_status = monitor.current_status
+            device=monitor.device;
+            # Vérification du statut
+            ok = False
+            if device.ip:
+                ok = check_ping(device.ip, ping_count, ping_timeout)
+            if not ok and device.url:
+                ok = check_url(device.url, http_timeout)
+            
+            monitor.current_status = ok
+            
+            # Détection des changements d'état
+            if previous_status != ok:
+                if ok:
+                    downtime_duration = time.time() - monitor.downtime_start if monitor.downtime_start else 0
+                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
+                else:
+                    monitor.downtime_start = time.time()
+                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
+                
+                alert_queue.put({
+                    'type': 'status_change',
+                    'device': device.name,
+                    'status': ok,
+                    'time': time.time()
+                })
+                status_changes.append(device)
+        
+        # Message vocal uniquement si changement
+        if status_changes:
+            down_devices = [d.name for d in devices if not device_monitors[d.name].current_status]
+            if down_devices:
+                message = f"{' '.join(down_devices)} injoignable"
+            else:
+                message = "Tout est joignable"
+            
+            engine.say(message)
+            engine.runAndWait()
+        
+        elapsed = time.time() - start_time
+        time.sleep(max(0, interval - elapsed))
+
+def load_devices_from_json(filename="devices.json"):
+    devices = []
+    try:
+        file_path = Path(filename)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Fichier {filename} introuvable")
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        for item in data:
+            if 'name' not in item:
+                print(f"Erreur: Entrée invalide dans le JSON - clé 'name' manquante: {item}")
+                continue
+                
+            devices.append(Device(
+                name=item['name'],
+                ip=item.get('ip'),
+                url=item.get('url'),
+                is_important=item.get('is_important', False)
+            ))
+            
+        return devices
+    
+    except json.JSONDecodeError as e:
+        print(f"Erreur de parsing JSON: {e}")
+        return []
+    except Exception as e:
+        print(f"Erreur de chargement: {str(e)}")
+        return []
+
+
+
+if __name__ == "__main__":
+    
+    speech_speed=140
+    interval=10
+    ping_count=2
+    ping_timeout=1
+    http_timeout=3
+    # Charger les périphériques depuis le fichier JSON
+    devices = load_devices_from_json()
+    
+    if not devices:
+        print("Aucun périphérique chargé. Vérifiez le fichier devices.json")
+        exit(1)
+    
+    alert_queue = queue.Queue()
+    device_monitors = {device.name: DeviceMonitor(device) for device in devices}
+    
+    # Démarrer le thread de monitoring
+    monitor_thread = threading.Thread(
+        target=monitor,
+        args=(device_monitors, alert_queue, interval,  ping_count, ping_timeout, http_timeout,speech_speed),
+        daemon=True
+    )
+    monitor_thread.start()
+    
+    # Lancer l'interface graphique
+    app = NetworkMonitorApp(device_monitors, alert_queue)
+    app.mainloop()
