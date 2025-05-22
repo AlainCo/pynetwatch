@@ -1,5 +1,6 @@
 from typing import Optional,Literal, Union, overload,Any,TextIO
 import requests
+import urllib3 
 import time
 import threading
 import queue
@@ -333,9 +334,10 @@ def check_url(url:str, retry:int=1,timeout:int=5):
     i=0
     while i<retry:
         try:
-            response = requests.get(url, timeout=timeout, verify=False)
+            response = requests.get(url, timeout=timeout, verify=False,)
             return response.status_code <500
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur HTTP pour {url} : {e}")
             i += 1
     else:
         return False
@@ -425,6 +427,7 @@ def load_devices_from_json(filename:str="devices.json")->list[Device]:
 
 
 if __name__ == "__main__":
+    urllib3.disable_warnings()
     
     config:Config=Config()
     #eventually reset the config_file from args with args 
