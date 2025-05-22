@@ -15,6 +15,7 @@ import pyttsx3 # type: ignore
 from pyttsx3.engine import Engine # type: ignore
 from icmplib import ping as icmp_ping # type: ignore
 
+MAX_QUEUE_SIZE = 1000  # Évite l'explosion mémoire
 
 # pour les ressources pyinstaller
 def resource_path(relative_path):# type: ignore
@@ -172,7 +173,7 @@ class NetworkMonitorApp(tk.Tk):
     def __init__(self, device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData], config:Config, *args:Any, **kwargs:Any):
         super().__init__(*args, **kwargs)
         
-        # Configuration initiale
+        # Configuration initiale icones
         self.current_icon = ""
         self.icons = {
             "ok": self._get_icon_path("ok.ico"),
@@ -185,11 +186,14 @@ class NetworkMonitorApp(tk.Tk):
         
         
         
-        self.title("Network Monitor")
+        
         self.alert_queue = alert_queue
         self.device_monitors = device_monitors
+        # Queue thread-safe pour les logs
+        self.log_queue:Queue[str] = queue.Queue()
         
         # Configuration de l'interface
+        self.title("Network Monitor")
         self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
         self.status_label.pack(side=tk.TOP)
         
@@ -217,11 +221,13 @@ class NetworkMonitorApp(tk.Tk):
         self.log_frame.pack_forget()
         
         # Redirection vers la zone de logs
-        sys.stdout = self.LogRedirectorGUI(sys.stdout, self.log_text)
-        sys.stderr = self.LogRedirectorGUI(sys.stderr, self.log_text)
+        sys.stdout = self.LogProducer(sys.stdout, self.log_queue)
+        sys.stderr = self.LogProducer(sys.stderr, self.log_queue)
         
-        self.update_interval = config.update_interval
+        #self.update_interval = config.update_interval
+        self.update_interval=1000
         self.update_display()
+        #self.after(100, self.process_log_queue)
     
     def toggle_logs(self):
         if self.log_visible:
@@ -231,25 +237,34 @@ class NetworkMonitorApp(tk.Tk):
             self.log_frame.pack(fill=tk.BOTH, expand=True)
             self.toggle_btn.config(text="▲ Masquer les logs ▼")
         self.log_visible = not self.log_visible        
-        
-    class LogRedirectorGUI:
-        def __init__(self, original_stream:TextIO, text_widget:Text):
+    class LogProducer:
+        def __init__(self, original_stream:TextIO, log_queue:Queue[str]):
             self.original_stream = original_stream
-            self.text_widget = text_widget
+            self.log_queue = log_queue
             
         def write(self, message:str):
-             # Nécessaire pour les applications frozen
-            if not self.text_widget.winfo_exists():
-                return
             self.original_stream.write(message)
-            self.text_widget.configure(state='normal')
-            self.text_widget.insert('end', message)
-            self.text_widget.see('end')
-            self.text_widget.configure(state='disabled')
-            
+            if message.strip():
+                if self.log_queue.qsize() < MAX_QUEUE_SIZE:
+                    self.log_queue.put(message.strip())
+                else:
+                    pass
         def flush(self):
-            self.original_stream.flush()
-            
+            pass
+
+    def process_log_queue(self):
+        """Vide la queue de logs dans le widget (thread principal)"""
+        while True:
+            try:
+                msg = self.log_queue.get_nowait()
+                self.log_text.configure(state='normal')
+                self.log_text.insert('end', msg + '\n')
+                self.log_text.see('end')
+                self.log_text.configure(state='disabled')
+            except queue.Empty:
+                break
+        #self.after(100, self.process_log_queue)  # Reprogrammation
+ 
             
     def _get_icon_path(self, filename:str):
         """Gère le chemin des ressources pour PyInstaller"""
@@ -279,11 +294,6 @@ class NetworkMonitorApp(tk.Tk):
             )
     
     def update_display(self):
-        try:
-            alert_data = self.alert_queue.get_nowait()
-            self.process_alert(alert_data)
-        except queue.Empty:
-            pass
         
         self.tree.delete(*self.tree.get_children())
         any_down = False
@@ -308,17 +318,9 @@ class NetworkMonitorApp(tk.Tk):
             else:
                 self.status_label.config(text="Tout est joignable", foreground="green",font=('Helvetica', 10, 'normal'))
                 self._change_icon('ok')
-        
+        self.process_log_queue()
         self.after(self.update_interval, self.update_display)
     
-    def process_alert(self, alert_data:AlertData):
-        if alert_data.kind == "status_change":
-            device_name:str = alert_data.device
-            monitor = self.device_monitors[device_name]
-            if not alert_data.status:
-                monitor.downtime_start = time.time()
-            else:
-                monitor.downtime_start = None
 
 
 
@@ -337,7 +339,7 @@ def check_url(url:str, retry:int=1,timeout:int=5):
             response = requests.get(url, timeout=timeout, verify=False,)
             return response.status_code <500
         except requests.exceptions.RequestException as e:
-            print(f"Erreur HTTP pour {url} : {e}")
+            #print(f"Erreur HTTP pour {url} : {e}")
             i += 1
     else:
         return False
@@ -372,6 +374,7 @@ def monitor(device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData
                         print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
                     else:
                         print(f"[{time.strftime('%H:%M:%S')}] {device.name} connecté")
+                    monitor.downtime_start = None
                 else:
                     monitor.downtime_start = time.time()
                     print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
