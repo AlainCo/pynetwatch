@@ -1,17 +1,39 @@
+from typing import Optional,Literal, Union, overload,Any
 import requests
 import time
 import threading
 import queue
-import tkinter as tk
-from tkinter import ttk, messagebox
-import pyttsx3
-from icmplib import ping as icmp_ping
-from ipaddress import ip_address, IPv6Address
-from collections import defaultdict
+from queue import Queue
 import json
 from pathlib import Path
-from typing import Optional
+import tkinter as tk
+from tkinter import ttk
+import pyttsx3 # type: ignore
+from pyttsx3.engine import Engine # type: ignore
+from icmplib import ping as icmp_ping # type: ignore
 
+
+
+
+
+SpeechPropertyName = Literal['rate', 'volume', 'voice', 'pitch']
+SpeechPropertyValue = Union[int, float, str]
+
+class SpeechEngine(Engine):
+    @overload
+    def setProperty(self, name: Literal['rate', 'pitch'], value: int) -> None: ...
+    @overload
+    def setProperty(self, name: Literal['volume'], value: float) -> None: ...
+    @overload
+    def setProperty(self, name: Literal['voice'], value: str) -> None: ...
+    
+    def setProperty(self, name: SpeechPropertyName, value: SpeechPropertyValue) -> None:
+        super().setProperty(name, value) # type: ignore[assignment]
+    def say(self, text:str, name:Optional[str]=None)->None: 
+        super().say(text,name) # type: ignore[assignment]
+    def runAndWait(self)->None:
+        super().runAndWait()
+        
 class Config:
     def __init__(self):
         # Valeurs par défaut
@@ -69,8 +91,15 @@ class DeviceMonitor:
         self.downtime_start: Optional[float] = None  # Type float pour les timestamps
         self.current_status: Optional[bool] = True
 
+class AlertData:
+    def __init__(self,kind:str,device:Device,status:bool,time:float):
+        self.kind=kind
+        self.device=device.name
+        self.status=status
+        self.time=time
+
 class NetworkMonitorApp(tk.Tk):
-    def __init__(self, device_monitors, alert_queue, config, *args, **kwargs):
+    def __init__(self, device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData], config:Config, *args:Any, **kwargs:Any):
         super().__init__(*args, **kwargs)
         self.title("Network Monitor")
         self.alert_queue = alert_queue
@@ -111,23 +140,23 @@ class NetworkMonitorApp(tk.Tk):
         
         self.after(self.update_interval, self.update_display)
     
-    def process_alert(self, alert_data):
-        if alert_data['type'] == 'status_change':
-            device_name = alert_data['device']
+    def process_alert(self, alert_data:AlertData):
+        if alert_data.kind == "status_change":
+            device_name:str = alert_data.device
             monitor = self.device_monitors[device_name]
-            if not alert_data['status']:
+            if not alert_data.status:
                 monitor.downtime_start = time.time()
             else:
                 monitor.downtime_start = None
 
-def check_ping(host, count=1, timeout=1):
+def check_ping(host:str, count:int=1, timeout:int=1):
     try:
         result = icmp_ping(host, count=count, timeout=timeout, privileged=False)
         return result.packets_received > 0
     except Exception:
         return False
 
-def check_url(url, retry=1,timeout=5):
+def check_url(url:str, retry:int=1,timeout:int=5):
     i=0
     while i<retry:
         try:
@@ -138,23 +167,21 @@ def check_url(url, retry=1,timeout=5):
     else:
         return False
 
-def monitor(device_monitors, alert_queue, config:Config):
-    engine = pyttsx3.init()
+def monitor(device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData], config:Config):
+    engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
     engine.setProperty('rate',config.speech_speed)
     engine.setProperty('volume',config.speech_volume)
-    
-    last_global_status = None
+    engine.setProperty('voice', 'french') 
     
     while True:
-        start_time = time.time()
-        status_changes = []
-        current_down = []
+        start_time:float = time.time()
+        status_changes:list[Device] = []
         
         for monitor in device_monitors.values():
             previous_status = monitor.current_status
             device=monitor.device;
             # Vérification du statut
-            ok = False
+            ok:bool = False
             if device.ip:
                 ok = check_ping(device.ip, config.ping_count, config.ping_timeout)
             if not ok and device.url:
@@ -171,12 +198,7 @@ def monitor(device_monitors, alert_queue, config:Config):
                     monitor.downtime_start = time.time()
                     print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
                 
-                alert_queue.put({
-                    'type': 'status_change',
-                    'device': device.name,
-                    'status': ok,
-                    'time': time.time()
-                })
+                alert_queue.put( AlertData(kind="status_change",device=device,status=ok,time=time.time()))
                 status_changes.append(device)
         
         # Message vocal uniquement si changement
@@ -193,8 +215,8 @@ def monitor(device_monitors, alert_queue, config:Config):
         elapsed = time.time() - start_time
         time.sleep(max(0, config.interval - elapsed))
 
-def load_devices_from_json(filename="devices.json"):
-    devices = []
+def load_devices_from_json(filename:str="devices.json")->list[Device]:
+    devices:list[Device] = []
     try:
         file_path = Path(filename)
         if not file_path.exists():
@@ -227,14 +249,9 @@ def load_devices_from_json(filename="devices.json"):
 
 
 if __name__ == "__main__":
-    config=Config()
+    config:Config=Config()
     config.load_config_from_json("config.json")
-    
-    speech_speed=140
-    interval=10
-    ping_count=2
-    ping_timeout=1
-    http_timeout=3
+
     # Charger les périphériques depuis le fichier JSON
     devices = load_devices_from_json()
     
@@ -242,8 +259,8 @@ if __name__ == "__main__":
         print("Aucun périphérique chargé. Vérifiez le fichier devices.json")
         exit(1)
     
-    alert_queue = queue.Queue()
-    device_monitors = {device.name: DeviceMonitor(device) for device in devices}
+    alert_queue:Queue[AlertData] = queue.Queue()
+    device_monitors:dict[str,DeviceMonitor] = {device.name: DeviceMonitor(device) for device in devices}
     
     # Démarrer le thread de monitoring
     monitor_thread = threading.Thread(
