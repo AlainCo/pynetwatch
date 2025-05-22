@@ -18,6 +18,8 @@
 # TODO:
 * vocal message and GUI are in French (Just add field in Config)
 * reading json into Device, and also setting default values from Config, could be made more automatic
+* I should add samples for Config and Device json
+* I should make a documentation for for Config and Device json at least 
 
 # Disclaimer: 
 * I'm an old programmer (Java, C/C++, and many scripting languages), but a rookie in Python
