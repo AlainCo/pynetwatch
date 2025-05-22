@@ -38,21 +38,20 @@ class SpeechMonitor:
         self.previous_statuses:dict[str,bool]={}
    
     def speech_monitor(self):
-        status_incomplete=True
-        previous_network_report=NetworkReport()
+
+        previous_report=NetworkReport()
         while True:
             start_time:float = time.time()
-            status_changed=status_incomplete
-            network_report=self.network_monitor.get_report()
-            if status_incomplete:
+            report=self.network_monitor.get_report()
+            if previous_report.devices_unknown:
                 status_changed=True
             else:
-                status_changed=((network_report.devices_up^previous_network_report.devices_up)|(network_report.devices_down^previous_network_report.devices_down))
-            status_incomplete=network_report.devices_unknown
+                status_changed=report.changed_from(previous_report)
+            status_incomplete=report.devices_unknown
             
             # Message vocal uniquement si changement
             if status_changed and not status_incomplete:
-                down_devices =[report.device.name for report in network_report.devices_down]
+                down_devices =[report.device.name for report in report.devices_down]
                 if down_devices:
                     message = f"{' , '.join(down_devices)} injoignable"
                 else:
@@ -64,7 +63,7 @@ class SpeechMonitor:
                 time.sleep(1.0)
             else:
                 time.sleep(max(0.0, self.config.interval - elapsed))
-            previous_network_report=network_report
+            previous_report=report
 
     def start(self):
          # Démarrer le thread de speech monitoring

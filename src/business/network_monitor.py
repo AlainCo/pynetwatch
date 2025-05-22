@@ -25,9 +25,11 @@ class NetworkMonitor:
             
     def get_report(self):
         report=NetworkReport()
-        report.devices_up=set(monitor.report for monitor in self.device_monitors if monitor.report.current_status is True)
-        report.devices_down=set(monitor.report for monitor in self.device_monitors if monitor.report.current_status is False)
-        report.devices_unknown=set(monitor.report for monitor in self.device_monitors if monitor.report.current_status is None)
-        report.devices_down_important=set(monitor.report for monitor in self.device_monitors if monitor.report.current_status is False and monitor.device.is_important)
+        report.devices_up=[monitor.report for monitor in self.device_monitors if monitor.report.current_status is True]
+        report.devices_down=[monitor.report for monitor in self.device_monitors if monitor.report.current_status is False]
+        report.devices_unknown=[monitor.report for monitor in self.device_monitors if monitor.report.current_status is None]
+        report.devices_down_important=[
+            monitor.report for monitor in self.device_monitors
+            if monitor.report.current_status is False and monitor.device.is_important]
         return report
         
