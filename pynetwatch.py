@@ -1,13 +1,15 @@
-from typing import Optional,Literal, Union, overload,Any
+from typing import Optional,Literal, Union, overload,Any,TextIO
 import requests
 import time
 import threading
 import queue
+import sys
 from queue import Queue
 import json
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
+from tkinter import Text
 import pyttsx3 # type: ignore
 from pyttsx3.engine import Engine # type: ignore
 from icmplib import ping as icmp_ping # type: ignore
@@ -98,6 +100,7 @@ class AlertData:
         self.status=status
         self.time=time
 
+
 class NetworkMonitorApp(tk.Tk):
     def __init__(self, device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData], config:Config, *args:Any, **kwargs:Any):
         super().__init__(*args, **kwargs)
@@ -114,8 +117,58 @@ class NetworkMonitorApp(tk.Tk):
         self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
         self.status_label.pack()
         
+
+
+        # ... code existant ...
+        
+        # Ajout d'une zone de logs
+        self.log_frame = ttk.Frame(self)
+        self.log_text = tk.Text(self.log_frame, height=8, state='disabled')
+        self.log_text.pack(fill=tk.BOTH, expand=True)
+        
+        # Bouton pour escamoter
+        self.toggle_btn = ttk.Button(
+            self,
+            text="▲ Masquer les logs ▼",
+            command=self.toggle_logs
+        )
+        self.toggle_btn.pack(fill=tk.X)
+        self.log_visible = True
+        
+        # Redirection vers la zone de logs
+        sys.stdout = self.LogRedirectorGUI(sys.stdout, self.log_text)
+        sys.stderr = self.LogRedirectorGUI(sys.stderr, self.log_text)
+        
         self.update_interval = config.update_interval
         self.update_display()
+    
+    class LogRedirectorGUI:
+        def __init__(self, original_stream:TextIO, text_widget:Text):
+            self.original_stream = original_stream
+            self.text_widget = text_widget
+            
+        def write(self, message:str):
+            self.original_stream.write(message)
+            self.text_widget.configure(state='normal')
+            self.text_widget.insert('end', message)
+            self.text_widget.see('end')
+            self.text_widget.configure(state='disabled')
+            
+        def flush(self):
+            self.original_stream.flush()
+    
+ 
+    def toggle_logs(self):
+        if self.log_visible:
+            self.log_frame.pack_forget()
+            self.toggle_btn.config(text="▲ Afficher les logs ▼")
+        else:
+            self.log_frame.pack(fill=tk.BOTH, expand=True)
+            self.toggle_btn.config(text="▲ Masquer les logs ▼")
+        self.log_visible = not self.log_visible        
+        
+        
+
     
     def update_display(self):
         try:
@@ -148,6 +201,9 @@ class NetworkMonitorApp(tk.Tk):
                 monitor.downtime_start = time.time()
             else:
                 monitor.downtime_start = None
+
+
+
 
 def check_ping(host:str, count:int=1, timeout:int=1):
     try:
