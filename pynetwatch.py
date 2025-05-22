@@ -14,43 +14,38 @@ from typing import Optional
 
 class Config:
     def __init__(self):
-        self.speech_speed=140
-        self.interval=10
-        self.ping_count=2
-        self.ping_timeout=1
-        self.http_timeout=3
+        # Valeurs par défaut
+        self.speech_speed = 140
+        self.speech_volume=1.0
+        self.interval = 10
+        self.ping_count = 2
+        self.ping_timeout = 1
+        self.http_timeout = 3
+        self.http_retry = 2
+        self.update_interval=1000
+
         
-    def load_config_from_json(
-            self,
-            filename:str="config.json"):
-        try:
-            file_path = Path(filename)
-            if not file_path.exists():
-                raise FileNotFoundError(f"Fichier {filename} introuvable")
-            
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                
-            for item in data:
-                if 'name' not in item:
-                    print(f"Erreur: Entrée invalide dans le JSON - clé 'name' manquante: {item}")
-                    continue
-                    
-                devices.append(Device(
-                    name=item['name'],
-                    ip=item.get('ip'),
-                    url=item.get('url'),
-                    is_important=item.get('is_important', False)
-                ))
-                
-            return devices
+    def load_config_from_json(self, filename: str = "config.json") -> None:
+        """Charge les données du JSON dans les attributs de la classe."""
+        file_path = Path(filename)
         
-        except json.JSONDecodeError as e:
-            print(f"Erreur de parsing JSON: {e}")
-            return []
-        except Exception as e:
-            print(f"Erreur de chargement: {str(e)}")
-            return []
+        # Crée le fichier JSON avec les valeurs par défaut s'il n'existe pas
+        if not file_path.exists():
+            self._generate_default_config(file_path)
+        
+        # Charge et applique les données du JSON
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            for key, value in data.items():
+                if hasattr(self, key):  # Ne met à jour que les attributs existants
+                    setattr(self, key, value)
+    
+    def _generate_default_config(self, path: Path) -> None:
+        """Génère un fichier JSON avec les valeurs par défaut de la classe."""
+        with open(path, 'w', encoding='utf-8') as f:
+            # Convertit les attributs de la classe en dictionnaire, excluant les méthodes
+            default_data = {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+            json.dump(default_data, f, indent=4)
 
 
 class Device:
@@ -75,7 +70,7 @@ class DeviceMonitor:
         self.current_status: Optional[bool] = True
 
 class NetworkMonitorApp(tk.Tk):
-    def __init__(self, device_monitors, alert_queue, *args, **kwargs):
+    def __init__(self, device_monitors, alert_queue, config, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title("Network Monitor")
         self.alert_queue = alert_queue
@@ -90,7 +85,7 @@ class NetworkMonitorApp(tk.Tk):
         self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
         self.status_label.pack()
         
-        self.update_interval = 1000
+        self.update_interval = config.update_interval
         self.update_display()
     
     def update_display(self):
@@ -132,16 +127,22 @@ def check_ping(host, count=1, timeout=1):
     except Exception:
         return False
 
-def check_url(url, timeout=5):
-    try:
-        response = requests.get(url, timeout=timeout, verify=False)
-        return response.status_code <500
-    except requests.exceptions.RequestException:
+def check_url(url, retry=1,timeout=5):
+    i=0
+    while i<retry:
+        try:
+            response = requests.get(url, timeout=timeout, verify=False)
+            return response.status_code <500
+        except requests.exceptions.RequestException:
+            i += 1
+    else:
         return False
 
-def monitor(device_monitors, alert_queue, interval, ping_count, ping_timeout, http_timeout,speech_speed):
+def monitor(device_monitors, alert_queue, config:Config):
     engine = pyttsx3.init()
-    engine.setProperty('rate',speech_speed)
+    engine.setProperty('rate',config.speech_speed)
+    engine.setProperty('volume',config.speech_volume)
+    
     last_global_status = None
     
     while True:
@@ -155,9 +156,9 @@ def monitor(device_monitors, alert_queue, interval, ping_count, ping_timeout, ht
             # Vérification du statut
             ok = False
             if device.ip:
-                ok = check_ping(device.ip, ping_count, ping_timeout)
+                ok = check_ping(device.ip, config.ping_count, config.ping_timeout)
             if not ok and device.url:
-                ok = check_url(device.url, http_timeout)
+                ok = check_url(device.url, config.http_retry, config.http_timeout)
             
             monitor.current_status = ok
             
@@ -190,7 +191,7 @@ def monitor(device_monitors, alert_queue, interval, ping_count, ping_timeout, ht
             engine.runAndWait()
         
         elapsed = time.time() - start_time
-        time.sleep(max(0, interval - elapsed))
+        time.sleep(max(0, config.interval - elapsed))
 
 def load_devices_from_json(filename="devices.json"):
     devices = []
@@ -226,6 +227,8 @@ def load_devices_from_json(filename="devices.json"):
 
 
 if __name__ == "__main__":
+    config=Config()
+    config.load_config_from_json("config.json")
     
     speech_speed=140
     interval=10
@@ -245,11 +248,11 @@ if __name__ == "__main__":
     # Démarrer le thread de monitoring
     monitor_thread = threading.Thread(
         target=monitor,
-        args=(device_monitors, alert_queue, interval,  ping_count, ping_timeout, http_timeout,speech_speed),
+        args=(device_monitors, alert_queue, config),
         daemon=True
     )
     monitor_thread.start()
     
     # Lancer l'interface graphique
-    app = NetworkMonitorApp(device_monitors, alert_queue)
+    app = NetworkMonitorApp(device_monitors, alert_queue,config)
     app.mainloop()

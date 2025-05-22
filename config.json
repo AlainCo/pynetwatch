@@ -1,0 +1,10 @@
+{
+    "speech_speed": 150,
+    "speech_volume": 1.0,
+    "interval": 10,
+    "ping_count": 2,
+    "ping_timeout": 1,
+    "http_timeout": 3,
+    "http_retry":2,
+    "update_interval": 1000
+}
