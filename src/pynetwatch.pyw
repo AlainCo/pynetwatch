@@ -10,7 +10,7 @@ from queue import Queue
 import json
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk,Text
+from tkinter import ttk
 import pyttsx3 # type: ignore
 from pyttsx3.engine import Engine # type: ignore
 from icmplib import ping as icmp_ping # type: ignore
@@ -175,14 +175,12 @@ class NetworkMonitorApp(tk.Tk):
         
         # Configuration initiale icones
         self.current_icon = ""
+        self.current_icon_handle=None
         self.icons = {
             "ok": self._get_icon_path("ok.ico"),
             "warn": self._get_icon_path("warn.ico"),
             "alert": self._get_icon_path("alert.ico")
         }
-        
-        # Définir l'icône initiale
-        self._change_icon(self.current_icon)
 
         self.device_monitors = device_monitors
         # Queue thread-safe pour les logs
@@ -223,7 +221,6 @@ class NetworkMonitorApp(tk.Tk):
         #self.update_interval = config.update_interval
         self.update_interval=1000
         self.update_display()
-        #self.after(100, self.process_log_queue)
     
     def toggle_logs(self):
         if self.log_visible:
@@ -259,7 +256,6 @@ class NetworkMonitorApp(tk.Tk):
                 self.log_text.configure(state='disabled')
             except queue.Empty:
                 break
-        #self.after(100, self.process_log_queue)  # Reprogrammation
  
             
     def _get_icon_path(self, filename:str):
@@ -272,22 +268,41 @@ class NetworkMonitorApp(tk.Tk):
         """Change l'icône de la fenêtre et de la barre des tâches"""
         if icon_name not in self.icons:
             return
-               
-        self.current_icon = icon_name
+        if self.current_icon == icon_name:
+            return
+        
         icon_path = self.icons[icon_name]
         
         # Pour Windows
+        
         if sys.platform == "win32":
             import win32gui
             import win32con
-            
-            hwnd = win32gui.GetParent(self.winfo_id())
-            win32gui.SendMessage(
-                hwnd,
-                win32con.WM_SETICON,
-                win32con.ICON_BIG,
-                win32gui.LoadImage(0, icon_path, win32con.IMAGE_ICON, 0, 0, win32con.LR_LOADFROMFILE) #type: ignore
-            )
+            try:
+                hwnd = win32gui.GetParent(self.winfo_id())
+                if not hwnd:
+                    print(f"_change_icon: Pas de fenetre parente ")
+                    return
+                if self.current_icon_handle:
+                    win32gui.DestroyIcon(self.current_icon_handle) #type: ignore
+                    
+                # Charger la nouvelle icône
+                self.current_icon_handle = win32gui.LoadImage(
+                    0, icon_path, win32con.IMAGE_ICON, 0, 0, 
+                    win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+                )
+
+                # Mise à jour des deux tailles d'icônes
+                for icon_type in [win32con.ICON_SMALL, win32con.ICON_BIG]:
+                    win32gui.SendMessage(
+                        hwnd,
+                        win32con.WM_SETICON,
+                        icon_type,
+                        self.current_icon_handle # type: ignore
+                    )
+                self.current_icon = icon_name
+            except Exception as e:
+                print(f"Erreur dans _change_icon: {e}")
     
     def update_display(self):
         
@@ -340,11 +355,51 @@ def check_url(url:str, retry:int=1,timeout:int=5):
     else:
         return False
 
-def monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
+def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
     engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
     engine.setProperty('rate',config.speech_speed)
     engine.setProperty('volume',config.speech_volume)
     engine.setProperty('voice', 'french') 
+    
+    previous_statuses:dict[str,bool]={}
+    status_incomplete=True
+    
+    while True:
+        start_time:float = time.time()
+        status_changed=status_incomplete
+        status_incomplete=False
+        
+        for monitor in device_monitors.values():
+            name=monitor.device.name
+            current_status=monitor.current_status
+            if current_status is not None:
+                if  name in previous_statuses:
+                    if not current_status==previous_statuses[name]: 
+                        status_changed=True
+                else:
+                    status_incomplete=True
+                previous_statuses[name]=current_status
+        
+        # Message vocal uniquement si changement
+        if status_changed and not status_incomplete:
+            down_devices = [m.device.name for m in device_monitors.values() if m.current_status==False]
+            if down_devices:
+                message = f"{' , '.join(down_devices)} injoignable"
+            else:
+                message = "Tout est joignable"
+            
+            engine.say(message)
+            engine.runAndWait()
+        
+        elapsed = time.time() - start_time
+        time.sleep(max(0, config.interval - elapsed))
+
+
+def monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
+    #engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
+    #engine.setProperty('rate',config.speech_speed)
+    #engine.setProperty('volume',config.speech_volume)
+    #engine.setProperty('voice', 'french') 
     
     while True:
         start_time:float = time.time()
@@ -378,15 +433,14 @@ def monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
                 status_changes.append(device)
         
         # Message vocal uniquement si changement
-        if status_changes:
-            down_devices = [d.name for d in devices if not device_monitors[d.name].current_status]
-            if down_devices:
-                message = f"{' , '.join(down_devices)} injoignable"
-            else:
-                message = "Tout est joignable"
-            
-            engine.say(message)
-            engine.runAndWait()
+        #if status_changes:
+        #    down_devices = [d.name for d in devices if not device_monitors[d.name].current_status]
+        #    if down_devices:
+        #        message = f"{' , '.join(down_devices)} injoignable"
+        #    else:
+        #        message = "Tout est joignable"    
+        #    engine.say(message)
+        #    engine.runAndWait()
         
         elapsed = time.time() - start_time
         time.sleep(max(0, config.interval - elapsed))
@@ -455,6 +509,14 @@ if __name__ == "__main__":
         daemon=True
     )
     monitor_thread.start()
+    
+     # Démarrer le thread de speech monitoring
+    speech_monitor_thread = threading.Thread(
+        target=speech_monitor,
+        args=(device_monitors, config),
+        daemon=True
+    )
+    speech_monitor_thread.start()
     
     # Lancer l'interface graphique
     app = NetworkMonitorApp(device_monitors, config)

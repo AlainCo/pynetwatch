@@ -7,4 +7,3 @@ rem     --hidden-import=pyttsx3.drivers --hidden-import=pyttsx3.drivers.dummy --
 rem     --hidden-import=pyttsx3.drivers.nsss --hidden-import=pyttsx3.drivers.sapi5 ^
 pyinstaller --windowed --onefile --clean --add-data "icons/*.ico;icons/"  src\pynetwatch.pyw
 call .venv\Scripts\deactivate
-pause
