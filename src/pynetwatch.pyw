@@ -253,29 +253,29 @@ class NetworkMonitorApp(tk.Tk):
     def _get_icon_path(self, filename:str):
         """Gère le chemin des ressources pour PyInstaller"""
         if getattr(sys, 'frozen', False):
-            return os.path.join(sys._MEIPASS, "icons", filename) #
+            return os.path.join(sys._MEIPASS, "icons", filename) # type: ignore
         return os.path.join("icons", filename)
 
     def _change_icon(self, icon_name:str):
         """Change l'icône de la fenêtre et de la barre des tâches"""
         if icon_name not in self.icons:
             return
-        if self.current_icon != icon_name:           
-            self.current_icon = icon_name
-            icon_path = self.icons[icon_name]
+               
+        self.current_icon = icon_name
+        icon_path = self.icons[icon_name]
+        
+        # Pour Windows
+        if sys.platform == "win32":
+            import win32gui
+            import win32con
             
-            # Pour Windows
-            if sys.platform == "win32":
-                import win32gui
-                import win32con
-                
-                hwnd = win32gui.GetParent(self.winfo_id())
-                win32gui.SendMessage(
-                    hwnd,
-                    win32con.WM_SETICON,
-                    win32con.ICON_SMALL,
-                    win32gui.LoadImage(0, icon_path, win32con.IMAGE_ICON, 0, 0, win32con.LR_LOADFROMFILE)
-                )
+            hwnd = win32gui.GetParent(self.winfo_id())
+            win32gui.SendMessage(
+                hwnd,
+                win32con.WM_SETICON,
+                win32con.ICON_BIG,
+                win32gui.LoadImage(0, icon_path, win32con.IMAGE_ICON, 0, 0, win32con.LR_LOADFROMFILE) #type: ignore
+            )
     
     def update_display(self):
         try:
