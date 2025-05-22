@@ -49,7 +49,9 @@ class Config:
         # Valeurs par défaut
         self.speech_speed = 140
         self.speech_volume=1.0
-        self.interval = 10
+        self.interval = 10.0
+        self.failed_accelerate=1.0
+        self.accelerate=1.0
         self.ping_count = 2
         self.ping_timeout = 1
         self.http_timeout = 3
@@ -57,7 +59,8 @@ class Config:
         self.log_file='nul:'
         self.devices_file='devices.json'
         self.config_file='pynetwatch-config.json'
-        self.config_create=False;
+        self.config_create=False
+
 
         
     def load_config_from_json(self, filename:str) -> None:
@@ -148,11 +151,13 @@ class Device:
         ip: Optional[str] = None,
         url: Optional[str] = None,
         is_important: bool = False,
-        interval:int=30,
+        interval:float=30.0,
         ping_count:int=1,
         ping_timeout:int=1,
         http_timeout:int=30,
-        http_retry:int=1
+        http_retry:int=1,
+        accelerate:float=1.0,
+        failed_accelerate:float=1.0
     ):
         self.name: str = name
         self.ip: Optional[str] = ip
@@ -163,6 +168,8 @@ class Device:
         self.ping_timeout = ping_timeout
         self.http_timeout = http_timeout
         self.http_retry = http_retry
+        self.accelerate=accelerate
+        self.failed_accelerate=failed_accelerate
         
 
 class DeviceMonitor:
@@ -400,12 +407,12 @@ def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
             engine.runAndWait()
         
         elapsed = time.time() - start_time
-        time.sleep(max(0, config.interval - elapsed))
+        time.sleep(max(0.0, config.interval - elapsed))
 
 def monitor_device(monitor:DeviceMonitor, config:Config):
     #décale les moment de démarrage pour éviter les rafales, au hasard dans 20% de l'intervalle
-    start_delay_millis=random.randrange(0,config.interval *1000//5,1)
-    time.sleep(start_delay_millis/1000)
+    start_delay=random.uniform(0.0,monitor.device.interval/5)
+    time.sleep(start_delay)
     while True:
         start_time:float = time.time()
     
@@ -433,7 +440,10 @@ def monitor_device(monitor:DeviceMonitor, config:Config):
                 print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
         
         elapsed = time.time() - start_time
-        time.sleep(max(0, device.interval - elapsed))
+        interval_effective=device.interval/device.accelerate;
+        if not monitor.current_status:
+            interval_effective/=device.failed_accelerate
+        time.sleep(max(0.0, interval_effective - elapsed))
 
 def load_devices_from_json(filename:str,config:Config)->list[Device]:
     devices:list[Device] = []
@@ -456,6 +466,8 @@ def load_devices_from_json(filename:str,config:Config)->list[Device]:
                 url=item.get('url'),
                 is_important=item.get('is_important', False),
                 interval=item.get('interval', config.interval),
+                accelerate=item.get('accelerate', config.accelerate),
+                failed_accelerate=item.get('failed_accelerate', config.failed_accelerate),
                 ping_count=item.get('ping_count', config.ping_count),
                 ping_timeout=item.get('ping_timeout', config.ping_timeout),
                 http_timeout=item.get('http_timeout', config.http_timeout),
