@@ -43,6 +43,35 @@ class SpeechEngine(Engine):
         super().say(text,name) # type: ignore
     def runAndWait(self)->None:
         super().runAndWait()
+
+class Device:
+    def __init__(
+        self,
+        name: str,
+        ip: Optional[str] = None,
+        url: Optional[str] = None,
+        is_important: bool = False,
+        interval:float=30.0,
+        ping_count:int=1,
+        ping_timeout:int=1,
+        http_timeout:int=30,
+        http_retry:int=1,
+        accelerate:float=1.0,
+        failed_accelerate:float=1.0
+    ):
+        self.name: str = name
+        self.ip: Optional[str] = ip
+        self.url: Optional[str] = url
+        self.is_important: bool = is_important
+        self.interval = interval
+        self.ping_count = ping_count
+        self.ping_timeout = ping_timeout
+        self.http_timeout = http_timeout
+        self.http_retry = http_retry
+        self.accelerate=accelerate
+        self.failed_accelerate=failed_accelerate
+        
+
         
 class Config:
     def __init__(self):
@@ -143,35 +172,41 @@ class Config:
             return False
         raise ValueError(f"Valeur booléenne non reconnue: {value}")
 
-
-class Device:
-    def __init__(
-        self,
-        name: str,
-        ip: Optional[str] = None,
-        url: Optional[str] = None,
-        is_important: bool = False,
-        interval:float=30.0,
-        ping_count:int=1,
-        ping_timeout:int=1,
-        http_timeout:int=30,
-        http_retry:int=1,
-        accelerate:float=1.0,
-        failed_accelerate:float=1.0
-    ):
-        self.name: str = name
-        self.ip: Optional[str] = ip
-        self.url: Optional[str] = url
-        self.is_important: bool = is_important
-        self.interval = interval
-        self.ping_count = ping_count
-        self.ping_timeout = ping_timeout
-        self.http_timeout = http_timeout
-        self.http_retry = http_retry
-        self.accelerate=accelerate
-        self.failed_accelerate=failed_accelerate
-        
-
+    def load_devices_from_json(self)->list[Device]:
+        devices:list[Device] = []
+        try:
+            file_path = Path(config.devices_file)
+            if not file_path.exists():
+                raise FileNotFoundError(f"Fichier {config.devices_file} introuvable")
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            for item in data:
+                if 'name' not in item:
+                    print(f"Erreur: Entrée invalide dans le JSON - clé 'name' manquante: {item}")
+                    continue
+                    
+                devices.append(Device(
+                    name=item['name'],
+                    ip=item.get('ip'),
+                    url=item.get('url'),
+                    is_important=item.get('is_important', False),
+                    interval=item.get('interval', self.interval),
+                    accelerate=item.get('accelerate', self.accelerate),
+                    failed_accelerate=item.get('failed_accelerate', self.failed_accelerate),
+                    ping_count=item.get('ping_count', self.ping_count),
+                    ping_timeout=item.get('ping_timeout', self.ping_timeout),
+                    http_timeout=item.get('http_timeout', self.http_timeout),
+                    http_retry=item.get('http_retry', self.http_retry),
+                ))
+            return devices
+        except json.JSONDecodeError as e:
+            print(f"Erreur de parsing JSON: {e}")
+            return []
+        except Exception as e:
+            print(f"Erreur de chargement: {str(e)}")
+            return []
 class DeviceMonitor:
     def __init__(self, device: Device):
         self.device: Device = device
@@ -179,12 +214,62 @@ class DeviceMonitor:
         self.downtime_start: Optional[float] = None  # Type float pour les timestamps
         self.current_status: Optional[bool] = None
 
-class AlertData:
-    def __init__(self,kind:str,device:Device,status:bool,time:float):
-        self.kind=kind
-        self.device=device.name
-        self.status=status
-        self.time=time
+    def check_ping(self,host:str, count:int=1, timeout:int=1):
+        try:
+            result = icmp_ping(host, count=count, timeout=timeout, privileged=False)
+            return result.packets_received > 0
+        except Exception:
+            return False
+
+    def check_url(self,url:str, retry:int=1,timeout:int=5):
+        i=0
+        while i<retry:
+            try:
+                response = requests.get(url, timeout=timeout, verify=False,)
+                return response.status_code <500
+            except requests.exceptions.RequestException as e:
+                #print(f"Erreur HTTP pour {url} : {e}")
+                i += 1
+        else:
+            return False
+        
+    def run_monitor(self,config:Config):
+        #décale les moment de démarrage pour éviter les rafales, au hasard dans 20% de l'intervalle
+        start_delay=random.uniform(0.0,self.device.interval/5)
+        time.sleep(start_delay)
+        while True:
+            start_time:float = time.time()
+        
+            previous_status = self.current_status
+            device=self.device;
+            # Vérification du statut
+            ok:bool = False
+            if device.ip:
+                ok = self.check_ping(device.ip, device.ping_count, device.ping_timeout)
+            if not ok and device.url:
+                ok = self.check_url(device.url, device.http_retry, device.http_timeout)
+            self.current_status = ok
+            
+            # Détection des changements d'état
+            if previous_status is None or previous_status != ok:
+                if ok:
+                    downtime_duration = time.time() - self.downtime_start if self.downtime_start else 0
+                    if downtime_duration>0:
+                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
+                    else:
+                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} connecté")
+                    self.downtime_start = None
+                else:
+                    self.downtime_start = time.time()
+                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
+            
+            elapsed = time.time() - start_time
+            interval_effective=device.interval/device.accelerate;
+            if not self.current_status:
+                interval_effective/=device.failed_accelerate
+            time.sleep(max(0.0, interval_effective - elapsed))
+
+
 
 
 class NetworkMonitorApp(tk.Tk):
@@ -347,29 +432,6 @@ class NetworkMonitorApp(tk.Tk):
                 self._change_icon('ok')
         self.process_log_queue()
         self.after(self.update_interval, self.update_display)
-    
-
-
-
-
-def check_ping(host:str, count:int=1, timeout:int=1):
-    try:
-        result = icmp_ping(host, count=count, timeout=timeout, privileged=False)
-        return result.packets_received > 0
-    except Exception:
-        return False
-
-def check_url(url:str, retry:int=1,timeout:int=5):
-    i=0
-    while i<retry:
-        try:
-            response = requests.get(url, timeout=timeout, verify=False,)
-            return response.status_code <500
-        except requests.exceptions.RequestException as e:
-            #print(f"Erreur HTTP pour {url} : {e}")
-            i += 1
-    else:
-        return False
 
 def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
     engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
@@ -409,79 +471,6 @@ def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
         elapsed = time.time() - start_time
         time.sleep(max(0.0, config.interval - elapsed))
 
-def monitor_device(monitor:DeviceMonitor, config:Config):
-    #décale les moment de démarrage pour éviter les rafales, au hasard dans 20% de l'intervalle
-    start_delay=random.uniform(0.0,monitor.device.interval/5)
-    time.sleep(start_delay)
-    while True:
-        start_time:float = time.time()
-    
-        previous_status = monitor.current_status
-        device=monitor.device;
-        # Vérification du statut
-        ok:bool = False
-        if device.ip:
-            ok = check_ping(device.ip, device.ping_count, device.ping_timeout)
-        if not ok and device.url:
-            ok = check_url(device.url, device.http_retry, device.http_timeout)
-        monitor.current_status = ok
-        
-        # Détection des changements d'état
-        if previous_status is None or previous_status != ok:
-            if ok:
-                downtime_duration = time.time() - monitor.downtime_start if monitor.downtime_start else 0
-                if downtime_duration>0:
-                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
-                else:
-                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} connecté")
-                monitor.downtime_start = None
-            else:
-                monitor.downtime_start = time.time()
-                print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
-        
-        elapsed = time.time() - start_time
-        interval_effective=device.interval/device.accelerate;
-        if not monitor.current_status:
-            interval_effective/=device.failed_accelerate
-        time.sleep(max(0.0, interval_effective - elapsed))
-
-def load_devices_from_json(filename:str,config:Config)->list[Device]:
-    devices:list[Device] = []
-    try:
-        file_path = Path(filename)
-        if not file_path.exists():
-            raise FileNotFoundError(f"Fichier {filename} introuvable")
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            
-        for item in data:
-            if 'name' not in item:
-                print(f"Erreur: Entrée invalide dans le JSON - clé 'name' manquante: {item}")
-                continue
-                
-            devices.append(Device(
-                name=item['name'],
-                ip=item.get('ip'),
-                url=item.get('url'),
-                is_important=item.get('is_important', False),
-                interval=item.get('interval', config.interval),
-                accelerate=item.get('accelerate', config.accelerate),
-                failed_accelerate=item.get('failed_accelerate', config.failed_accelerate),
-                ping_count=item.get('ping_count', config.ping_count),
-                ping_timeout=item.get('ping_timeout', config.ping_timeout),
-                http_timeout=item.get('http_timeout', config.http_timeout),
-                http_retry=item.get('http_retry', config.http_retry),
-            ))
-            
-        return devices
-    
-    except json.JSONDecodeError as e:
-        print(f"Erreur de parsing JSON: {e}")
-        return []
-    except Exception as e:
-        print(f"Erreur de chargement: {str(e)}")
-        return []
 
 
 
@@ -496,12 +485,11 @@ if __name__ == "__main__":
     #update fields with args 
     config.load_config_from_cli_args(sys.argv[1:])
 
-    
     sys.stdout = open(config.log_file, 'a')
     sys.stderr = sys.stdout
 
     # Charger les périphériques depuis le fichier JSON
-    devices = load_devices_from_json(config.devices_file,config)
+    devices = config.load_devices_from_json()
     
     if not devices:
         print(f"Aucun périphérique chargé. Vérifiez le fichier {config.devices_file}")
@@ -512,8 +500,8 @@ if __name__ == "__main__":
     monitors_threads:dict[str,Thread]={
         name:
             threading.Thread(
-                target=monitor_device,
-                args=(device_monitors[name],config),
+                target=device_monitors[name].run_monitor,
+                args=(config,),
                 daemon=True) 
             for name in device_monitors 
             }
