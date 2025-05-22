@@ -246,17 +246,24 @@ class NetworkMonitorApp(tk.Tk):
         
         self.tree.delete(*self.tree.get_children())
         any_down = False
+        important_down=False
         
         for monitor in self.device_monitors.values():
             if monitor.current_status is False:
                 any_down = True
+                if monitor.device.is_important:
+                    important_down=True
                 downtime = time.strftime("%H:%M:%S", time.localtime(monitor.downtime_start)) if monitor.downtime_start else "N/A"
                 self.tree.insert('', 'end', values=(monitor.device.name, downtime))
         
-        if any_down:
-            self.status_label.config(text="Problèmes détectés", foreground="red")
+        
+        if important_down:
+            self.status_label.config(text="Problèmes graves détectés", foreground="red",font=('Helvetica', 18, 'bold'))
         else:
-            self.status_label.config(text="Tout est joignable", foreground="green")
+            if any_down:
+                self.status_label.config(text="Problèmes détectés", foreground="orange",font=('Helvetica', 15, 'bold'))
+            else:
+                self.status_label.config(text="Tout est joignable", foreground="green",font=('Helvetica', 10, 'normal'))
         
         self.after(self.update_interval, self.update_display)
     
@@ -331,7 +338,7 @@ def monitor(device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData
         if status_changes:
             down_devices = [d.name for d in devices if not device_monitors[d.name].current_status]
             if down_devices:
-                message = f"{' '.join(down_devices)} injoignable"
+                message = f"{' , '.join(down_devices)} injoignable"
             else:
                 message = "Tout est joignable"
             
