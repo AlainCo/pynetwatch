@@ -174,17 +174,19 @@ class NetworkMonitorApp(tk.Tk):
         self.device_monitors = device_monitors
         
         # Configuration de l'interface
+        self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
+        self.status_label.pack(side=tk.TOP)
+        
         self.tree = ttk.Treeview(self, columns=('Status', 'Downtime'), show='headings')
         self.tree.heading('Status', text='Statut')
         self.tree.heading('Downtime', text='Indisponible depuis')
         self.tree.pack(fill=tk.BOTH, expand=True)
         
-        self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
-        self.status_label.pack()
+
  
         # zone de logs
         self.log_frame = ttk.Frame(self)
-        self.log_text = tk.Text(self.log_frame, height=10, state='disabled')
+        self.log_text = tk.Text(self.log_frame, height=10, state='disabled',width=40)
         self.log_text.pack(fill=tk.BOTH, expand=True)
         
         # Bouton pour escamoter
@@ -193,7 +195,7 @@ class NetworkMonitorApp(tk.Tk):
             text="▲ Afficher les logs ▼",
             command=self.toggle_logs
         )
-        self.toggle_btn.pack(fill=tk.X)
+        self.toggle_btn.pack(fill=tk.X,side=tk.BOTTOM)
         
         self.log_visible = False
         self.log_frame.pack_forget()
