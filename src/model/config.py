@@ -23,6 +23,9 @@ class Config:
         self.ssh_key_password='password'
         self.ssh_retry=1
         self.ssh_timeout=3
+        self.ssh_decelerate=10.0
+        self.ssh_failed_accelerate=10.0
+        self.ssh_obsolete=False
         
 
     @staticmethod

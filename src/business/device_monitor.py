@@ -136,7 +136,11 @@ class DeviceMonitor:
                     print(f"[{time.strftime('%H:%M:%S')}] {self.device.name} injoignable")
             
             elapsed = time.time() - start_time
-            interval_effective=self.device.interval/self.device.accelerate;
+            interval_effective=self.device.interval/self.device.accelerate
+            if self.device.ssh_host:
+                interval_effective*=self.device.ssh_decelerate
+            if self.device.ssh_host and not self.report.current_status:
+                interval_effective/=self.device.ssh_failed_accelerate
             if not self.report.current_status:
                 interval_effective/=self.device.failed_accelerate
             time.sleep(max(0.0, interval_effective - elapsed))

@@ -29,7 +29,9 @@ class Device:
         ssh_retry:Optional[int]=1,
         ssh_timeout:int=30,
         ssh_user_password:Optional[str]=None,
-        ssh_obsolete:bool=False
+        ssh_obsolete:bool=False,
+        ssh_decelerate:float=1.0,
+        ssh_failed_accelerate:float=1.0
     ):
         self.name: str = name
         self.ip: Optional[str] = ip
@@ -53,6 +55,8 @@ class Device:
         self.ssh_timeout=ssh_timeout
         self.ssh_user_password=ssh_user_password
         self.ssh_obsolete=ssh_obsolete
+        self.ssh_decelerate=ssh_decelerate
+        self.ssh_failed_accelerate=ssh_failed_accelerate
         
         
     @staticmethod   
@@ -94,7 +98,9 @@ class Device:
                         ssh_retry=item.get('ssh_retry',config.ssh_retry),
                         ssh_timeout=item.get('ssh_timeout',config.ssh_timeout),
                         ssh_user_password=item.get('ssh_user_password',None),
-                        ssh_obsolete=item.get('ssh_obsolete',False)  
+                        ssh_obsolete=item.get('ssh_obsolete',config.ssh_obsolete),
+                        ssh_decelerate=item.get('ssh_decelerate',config.ssh_decelerate),
+                        ssh_failed_accelerate=item.get('ssh_failed_accelerate',config.ssh_failed_accelerate)
                 ))
             return devices
         except json.JSONDecodeError as e:
