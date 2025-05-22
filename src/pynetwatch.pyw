@@ -4,6 +4,7 @@ import time
 import threading
 import queue
 import sys
+import os
 from queue import Queue
 import json
 from pathlib import Path
@@ -169,6 +170,20 @@ class AlertData:
 class NetworkMonitorApp(tk.Tk):
     def __init__(self, device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData], config:Config, *args:Any, **kwargs:Any):
         super().__init__(*args, **kwargs)
+        
+        # Configuration initiale
+        self.current_icon = ""
+        self.icons = {
+            "ok": self._get_icon_path("ok.ico"),
+            "warn": self._get_icon_path("warn.ico"),
+            "alert": self._get_icon_path("alert.ico")
+        }
+        
+        # Définir l'icône initiale
+        self._change_icon(self.current_icon)
+        
+        
+        
         self.title("Network Monitor")
         self.alert_queue = alert_queue
         self.device_monitors = device_monitors
@@ -233,9 +248,34 @@ class NetworkMonitorApp(tk.Tk):
             
         def flush(self):
             self.original_stream.flush()
-    
- 
+            
+            
+    def _get_icon_path(self, filename:str):
+        """Gère le chemin des ressources pour PyInstaller"""
+        if getattr(sys, 'frozen', False):
+            return os.path.join(sys._MEIPASS, "icons", filename) #
+        return os.path.join("icons", filename)
 
+    def _change_icon(self, icon_name:str):
+        """Change l'icône de la fenêtre et de la barre des tâches"""
+        if icon_name not in self.icons:
+            return
+        if self.current_icon != icon_name:           
+            self.current_icon = icon_name
+            icon_path = self.icons[icon_name]
+            
+            # Pour Windows
+            if sys.platform == "win32":
+                import win32gui
+                import win32con
+                
+                hwnd = win32gui.GetParent(self.winfo_id())
+                win32gui.SendMessage(
+                    hwnd,
+                    win32con.WM_SETICON,
+                    win32con.ICON_SMALL,
+                    win32gui.LoadImage(0, icon_path, win32con.IMAGE_ICON, 0, 0, win32con.LR_LOADFROMFILE)
+                )
     
     def update_display(self):
         try:
@@ -259,11 +299,14 @@ class NetworkMonitorApp(tk.Tk):
         
         if important_down:
             self.status_label.config(text="Problèmes graves détectés", foreground="red",font=('Helvetica', 18, 'bold'))
+            self._change_icon('alert')
         else:
             if any_down:
                 self.status_label.config(text="Problèmes détectés", foreground="orange",font=('Helvetica', 15, 'bold'))
+                self._change_icon('warn')
             else:
                 self.status_label.config(text="Tout est joignable", foreground="green",font=('Helvetica', 10, 'normal'))
+                self._change_icon('ok')
         
         self.after(self.update_interval, self.update_display)
     

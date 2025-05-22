@@ -5,7 +5,7 @@ a = Analysis(
     ['src\\pynetwatch.pyw'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('icons/*.ico', 'icons/')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
