@@ -11,11 +11,16 @@ __pycache__/
 *.tmp
 *.log
 
+# Fichiers générés
+dist/
+build/
 # Fichiers sensibles (mots de passe, clés API)
 .env
 secrets.py
 devices.json
+
 #fichiers locaux
 *.lnk
+
 #fichiers de test
 test_tkinter.py

@@ -14,7 +14,11 @@ from pyttsx3.engine import Engine # type: ignore
 from icmplib import ping as icmp_ping # type: ignore
 
 
-
+# pour les ressources pyinstaller
+def resource_path(relative_path):# type: ignore
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)# type: ignore
+    return os.path.join(os.path.abspath("."), relative_path)# type: ignore
 
 
 SpeechPropertyName = Literal['rate', 'volume', 'voice', 'pitch']
@@ -29,9 +33,9 @@ class SpeechEngine(Engine):
     def setProperty(self, name: Literal['voice'], value: str) -> None: ...
     
     def setProperty(self, name: SpeechPropertyName, value: SpeechPropertyValue) -> None:
-        super().setProperty(name, value) # type: ignore[assignment]
+        super().setProperty(name, value) # type: ignore
     def say(self, text:str, name:Optional[str]=None)->None: 
-        super().say(text,name) # type: ignore[assignment]
+        super().say(text,name) # type: ignore
     def runAndWait(self)->None:
         super().runAndWait()
         
@@ -46,6 +50,8 @@ class Config:
         self.http_timeout = 3
         self.http_retry = 2
         self.update_interval=1000
+        self.log_file='pynetwatch.log'
+        self.devices_file='devices.json'
 
         
     def load_config_from_json(self, filename: str = "config.json") -> None:
@@ -62,13 +68,67 @@ class Config:
             for key, value in data.items():
                 if hasattr(self, key):  # Ne met à jour que les attributs existants
                     setattr(self, key, value)
-    
-    def _generate_default_config(self, path: Path) -> None:
-        """Génère un fichier JSON avec les valeurs par défaut de la classe."""
-        with open(path, 'w', encoding='utf-8') as f:
-            # Convertit les attributs de la classe en dictionnaire, excluant les méthodes
-            default_data = {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+
+    def _generate_default_config(self, file_path: Path) -> None:
+        """Crée un fichier de configuration par défaut."""
+        default_data = {key: getattr(self, key) for key in vars(self)}
+        with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(default_data, f, indent=4)
+                
+    def load_config_from_cli_args(self, args: list[str] = sys.argv[1:]) -> None:
+        """Modifie la configuration avec les arguments de ligne de commande."""
+        for arg in args:
+            if self._is_valid_arg(arg):
+                key, value = self._parse_arg(arg)
+                self._set_config_value(key, value)
+
+    def _is_valid_arg(self, arg: str) -> bool:
+        """Valide le format des arguments."""
+        return arg.startswith('--') and '=' in arg and len(arg.split('=')) == 2
+
+    def _parse_arg(self, arg: str) -> tuple[str, str]:
+        """Extrait la clé et la valeur d'un argument."""
+        key_value = arg[2:].split('=', 1)
+        return key_value[0].strip(), key_value[1].strip()
+
+    def _set_config_value(self, key: str, str_value: str) -> None:
+        """Convertit et assigne la valeur en respectant le type d'origine."""
+        if hasattr(self, key):
+            original_value = getattr(self, key)
+            target_type:type = type(original_value) # type: ignore
+            
+            try:
+                converted_value = self._convert_value(str_value, target_type)
+                setattr(self, key, converted_value)
+                print(f"Config: {key} modifié à {converted_value} ({target_type.__name__})")
+            except (ValueError, TypeError) as e:
+                print(f"Erreur de conversion pour {key}: {str(e)}")
+        else:
+            print(f"Avertissement: Clé de configuration inconnue - {key}")
+
+    def _convert_value(self, value: str, target_type: type) -> Any:
+        """Gère les conversions de type complexes."""
+        if target_type == bool:
+            return self._convert_to_bool(value)
+        try:
+            return target_type(value)
+        except ValueError:
+            # Gestion spéciale pour les float représentés comme int
+            if target_type == float and '.' not in value:
+                return float(value)
+            raise ValueError(f"Impossible de convertir '{value}' en {target_type.__name__}")
+
+    def _convert_to_bool(self, value: str) -> bool:
+        """Convertit différentes représentations textuelles en booléen."""
+        true_values = ['true', '1', 'yes', 'on', 't', 'y']
+        false_values = ['false', '0', 'no', 'off', 'f', 'n']
+        lower_val = value.lower()
+        
+        if lower_val in true_values:
+            return True
+        if lower_val in false_values:
+            return False
+        raise ValueError(f"Valeur booléenne non reconnue: {value}")
 
 
 class Device:
@@ -115,12 +175,8 @@ class NetworkMonitorApp(tk.Tk):
         
         self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
         self.status_label.pack()
-        
-
-
-        # ... code existant ...
-        
-        # Ajout d'une zone de logs
+ 
+        # zone de logs
         self.log_frame = ttk.Frame(self)
         self.log_text = tk.Text(self.log_frame, height=8, state='disabled')
         self.log_text.pack(fill=tk.BOTH, expand=True)
@@ -147,6 +203,9 @@ class NetworkMonitorApp(tk.Tk):
             self.text_widget = text_widget
             
         def write(self, message:str):
+             # Nécessaire pour les applications frozen
+            if not self.text_widget.winfo_exists():
+                return
             self.original_stream.write(message)
             self.text_widget.configure(state='normal')
             self.text_widget.insert('end', message)
@@ -304,14 +363,20 @@ def load_devices_from_json(filename:str="devices.json")->list[Device]:
 
 
 if __name__ == "__main__":
+    
     config:Config=Config()
-    config.load_config_from_json("config.json")
+    config.load_config_from_json("pynetwatch-config.json")
+    config.load_config_from_cli_args()  # Applique les arguments de ligne de commande
+    
+    #if getattr(sys, 'frozen', False):
+    sys.stdout = open(config.log_file, 'w')
+    sys.stderr = sys.stdout
 
     # Charger les périphériques depuis le fichier JSON
-    devices = load_devices_from_json()
+    devices = load_devices_from_json(config.devices_file)
     
     if not devices:
-        print("Aucun périphérique chargé. Vérifiez le fichier devices.json")
+        print(f"Aucun périphérique chargé. Vérifiez le fichier {config.devices_file}")
         exit(1)
     
     alert_queue:Queue[AlertData] = queue.Queue()
