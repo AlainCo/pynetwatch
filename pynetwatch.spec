@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['src\\pynetwatch.pyw'],
+    ['src\\main.pyw'],
     pathex=[],
     binaries=[],
     datas=[('icons/*.ico', 'icons/')],
