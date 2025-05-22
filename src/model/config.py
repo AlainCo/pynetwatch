@@ -19,6 +19,11 @@ class Config:
         self.devices_file='devices.json'
         self.config_file='pynetwatch-config.json'
         self.config_create=False
+        self.ssh_key_file='ssh.key'
+        self.ssh_key_password='password'
+        self.ssh_retry=1
+        self.ssh_timeout=3
+        
 
     @staticmethod
     def load():

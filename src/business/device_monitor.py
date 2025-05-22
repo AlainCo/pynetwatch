@@ -3,6 +3,9 @@ import random
 import time
 from icmplib import ping as icmp_ping # type: ignore
 from model import Device,Config,DeviceReport
+import paramiko
+import re
+
 #composant de surveillance d'un device
 class DeviceMonitor:
     def __init__(self, device: Device):
@@ -30,7 +33,77 @@ class DeviceMonitor:
                 i += 1
         else:
             return False
-        
+    
+    def check_ssh(self):
+        if self.device.ssh_host is None or self.device.ssh_user is None or self.device.ssh_command is None or self.device.ssh_key_file is None:
+            return False
+        if self.device.ssh_retry is None:
+            return False
+        i=0
+        while i<self.device.ssh_retry:
+            client=None
+            stdin, stdout, stderr=(None,None,None)
+            try:
+                # Création du client SSH
+                client = paramiko.SSHClient()
+                # Politique d'acceptation automatique de la clé d'hôte (à utiliser avec précaution)
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                # Connexion au serveur
+                if self.device.ssh_obsolete:
+                    disabled_algorithms={
+                        'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512'],
+                        'keys': ['rsa-sha2-256', 'rsa-sha2-512'],
+                        'kex': ['diffie-hellman-group-exchange-sha256'],
+                        'ciphers': ['aes256-ctr', 'aes256-cbc']
+                    }
+                else:
+                    disabled_algorithms=None
+                client.connect(
+                    hostname=self.device.ssh_host,
+                    username=self.device.ssh_user,
+                    key_filename =self.device.ssh_key_file,
+                    passphrase=self.device.ssh_key_password,
+                    gss_auth=False,
+                    gss_kex=False,
+                    compress=True,
+                    disabled_algorithms=disabled_algorithms
+                )
+                stdin, stdout, stderr = client.exec_command(self.device.ssh_command)
+    
+                # Récupération des résultats
+                
+                stdout_text=stdout.read().decode()
+                stderr_text=stderr.read().decode()
+                text=f"{stdout_text}\n{stderr_text}"
+                for pattern in self.device.ssh_pattern_required:
+                    try:
+                        regex = re.compile(pattern,flags=0)
+                        if not regex.search(text):
+                            return False
+                    except re.error:
+                        print(f"Expression régulière invalide ignorée : {pattern}")
+                for pattern in self.device.ssh_pattern_forbiden:
+                    try:
+                        regex = re.compile(pattern,flags=0)
+                        if regex.search(text):
+                            return False
+                    except re.error:
+                        print(f"Expression régulière invalide ignorée : {pattern}")
+                return True
+            except Exception:
+                i += 1
+            finally:
+                if client is not None:
+                    client.close()
+                if stdin is not None:
+                    stdin.close()
+                if stdout is not None:
+                    stdout.close()
+                if stderr is not None:
+                    stderr.close()
+        else:
+            return False
+    
     def run_monitor(self,config:Config):
         #décale les moment de démarrage pour éviter les rafales, au hasard dans 20% de l'intervalle
         start_delay=random.uniform(0.0,self.device.interval/5)
@@ -41,6 +114,8 @@ class DeviceMonitor:
             previous_status = self.report.current_status
             # Vérification du statut
             ok:bool = False
+            if self.device.ssh_host:
+                ok = self.check_ssh()
             if self.device.ip:
                 ok = self.check_ping()
             if not ok and self.device.url:

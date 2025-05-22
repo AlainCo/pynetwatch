@@ -1,9 +1,12 @@
 altgraph==0.17.4
 astroid==3.3.10
+bcrypt==4.3.0
 certifi==2025.4.26
+cffi==1.17.1
 charset-normalizer==3.4.2
 colorama==0.4.6
 comtypes==1.4.11
+cryptography==45.0.2
 dill==0.4.0
 icmplib==3.0.4
 idna==3.10
@@ -13,11 +16,14 @@ mccabe==0.7.0
 mypy==1.15.0
 mypy_extensions==1.1.0
 packaging==25.0
+paramiko==3.5.1
 pefile==2023.2.7
 platformdirs==4.3.8
+pycparser==2.22
 pyinstaller==6.13.0
 pyinstaller-hooks-contrib==2025.4
 pylint==3.3.7
+PyNaCl==1.5.0
 pypiwin32==223
 pyttsx3==2.98
 pywin32==310
