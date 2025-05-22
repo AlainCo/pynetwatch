@@ -170,7 +170,7 @@ class AlertData:
 
 
 class NetworkMonitorApp(tk.Tk):
-    def __init__(self, device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData], config:Config, *args:Any, **kwargs:Any):
+    def __init__(self, device_monitors:dict[str,DeviceMonitor], config:Config, *args:Any, **kwargs:Any):
         super().__init__(*args, **kwargs)
         
         # Configuration initiale icones
@@ -183,11 +183,7 @@ class NetworkMonitorApp(tk.Tk):
         
         # Définir l'icône initiale
         self._change_icon(self.current_icon)
-        
-        
-        
-        
-        self.alert_queue = alert_queue
+
         self.device_monitors = device_monitors
         # Queue thread-safe pour les logs
         self.log_queue:Queue[str] = queue.Queue()
@@ -344,7 +340,7 @@ def check_url(url:str, retry:int=1,timeout:int=5):
     else:
         return False
 
-def monitor(device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData], config:Config):
+def monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
     engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
     engine.setProperty('rate',config.speech_speed)
     engine.setProperty('volume',config.speech_volume)
@@ -379,7 +375,6 @@ def monitor(device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData
                     monitor.downtime_start = time.time()
                     print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
                 
-                alert_queue.put( AlertData(kind="status_change",device=device,status=ok,time=time.time()))
                 status_changes.append(device)
         
         # Message vocal uniquement si changement
@@ -451,17 +446,16 @@ if __name__ == "__main__":
         print(f"Aucun périphérique chargé. Vérifiez le fichier {config.devices_file}")
         exit(1)
     
-    alert_queue:Queue[AlertData] = queue.Queue()
     device_monitors:dict[str,DeviceMonitor] = {device.name: DeviceMonitor(device) for device in devices}
     
     # Démarrer le thread de monitoring
     monitor_thread = threading.Thread(
         target=monitor,
-        args=(device_monitors, alert_queue, config),
+        args=(device_monitors, config),
         daemon=True
     )
     monitor_thread.start()
     
     # Lancer l'interface graphique
-    app = NetworkMonitorApp(device_monitors, alert_queue,config)
+    app = NetworkMonitorApp(device_monitors, config)
     app.mainloop()
