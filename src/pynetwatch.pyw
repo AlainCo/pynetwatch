@@ -3,6 +3,8 @@ import requests
 import urllib3 
 import time
 import threading
+import random
+from threading import Thread
 import queue
 import sys
 import os
@@ -52,7 +54,6 @@ class Config:
         self.ping_timeout = 1
         self.http_timeout = 3
         self.http_retry = 2
-        self.update_interval=1000
         self.log_file='nul:'
         self.devices_file='devices.json'
         self.config_file='pynetwatch-config.json'
@@ -146,12 +147,22 @@ class Device:
         name: str,
         ip: Optional[str] = None,
         url: Optional[str] = None,
-        is_important: bool = False
+        is_important: bool = False,
+        interval:int=30,
+        ping_count:int=1,
+        ping_timeout:int=1,
+        http_timeout:int=30,
+        http_retry:int=1
     ):
         self.name: str = name
         self.ip: Optional[str] = ip
         self.url: Optional[str] = url
         self.is_important: bool = is_important
+        self.interval = interval
+        self.ping_count = ping_count
+        self.ping_timeout = ping_timeout
+        self.http_timeout = http_timeout
+        self.http_retry = http_retry
         
 
 class DeviceMonitor:
@@ -218,7 +229,6 @@ class NetworkMonitorApp(tk.Tk):
         sys.stdout = self.LogProducer(sys.stdout, self.log_queue)
         sys.stderr = self.LogProducer(sys.stderr, self.log_queue)
         
-        #self.update_interval = config.update_interval
         self.update_interval=1000
         self.update_display()
     
@@ -392,44 +402,40 @@ def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
         elapsed = time.time() - start_time
         time.sleep(max(0, config.interval - elapsed))
 
-
-def monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
-    
+def monitor_device(monitor:DeviceMonitor, config:Config):
+    #décale les moment de démarrage pour éviter les rafales, au hasard dans 20% de l'intervalle
+    start_delay_millis=random.randrange(0,config.interval *1000//5,1)
+    time.sleep(start_delay_millis/1000)
     while True:
         start_time:float = time.time()
-        status_changes:list[Device] = []
+    
+        previous_status = monitor.current_status
+        device=monitor.device;
+        # Vérification du statut
+        ok:bool = False
+        if device.ip:
+            ok = check_ping(device.ip, device.ping_count, device.ping_timeout)
+        if not ok and device.url:
+            ok = check_url(device.url, device.http_retry, device.http_timeout)
+        monitor.current_status = ok
         
-        for monitor in device_monitors.values():
-            previous_status = monitor.current_status
-            device=monitor.device;
-            # Vérification du statut
-            ok:bool = False
-            if device.ip:
-                ok = check_ping(device.ip, config.ping_count, config.ping_timeout)
-            if not ok and device.url:
-                ok = check_url(device.url, config.http_retry, config.http_timeout)
-            
-            monitor.current_status = ok
-            
-            # Détection des changements d'état
-            if previous_status is None or previous_status != ok:
-                if ok:
-                    downtime_duration = time.time() - monitor.downtime_start if monitor.downtime_start else 0
-                    if downtime_duration>0:
-                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
-                    else:
-                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} connecté")
-                    monitor.downtime_start = None
+        # Détection des changements d'état
+        if previous_status is None or previous_status != ok:
+            if ok:
+                downtime_duration = time.time() - monitor.downtime_start if monitor.downtime_start else 0
+                if downtime_duration>0:
+                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
                 else:
-                    monitor.downtime_start = time.time()
-                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
-                
-                status_changes.append(device)
+                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} connecté")
+                monitor.downtime_start = None
+            else:
+                monitor.downtime_start = time.time()
+                print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
         
         elapsed = time.time() - start_time
-        time.sleep(max(0, config.interval - elapsed))
+        time.sleep(max(0, device.interval - elapsed))
 
-def load_devices_from_json(filename:str="devices.json")->list[Device]:
+def load_devices_from_json(filename:str,config:Config)->list[Device]:
     devices:list[Device] = []
     try:
         file_path = Path(filename)
@@ -448,7 +454,12 @@ def load_devices_from_json(filename:str="devices.json")->list[Device]:
                 name=item['name'],
                 ip=item.get('ip'),
                 url=item.get('url'),
-                is_important=item.get('is_important', False)
+                is_important=item.get('is_important', False),
+                interval=item.get('interval', config.interval),
+                ping_count=item.get('ping_count', config.ping_count),
+                ping_timeout=item.get('ping_timeout', config.ping_timeout),
+                http_timeout=item.get('http_timeout', config.http_timeout),
+                http_retry=item.get('http_retry', config.http_retry),
             ))
             
         return devices
@@ -478,7 +489,7 @@ if __name__ == "__main__":
     sys.stderr = sys.stdout
 
     # Charger les périphériques depuis le fichier JSON
-    devices = load_devices_from_json(config.devices_file)
+    devices = load_devices_from_json(config.devices_file,config)
     
     if not devices:
         print(f"Aucun périphérique chargé. Vérifiez le fichier {config.devices_file}")
@@ -486,13 +497,17 @@ if __name__ == "__main__":
     
     device_monitors:dict[str,DeviceMonitor] = {device.name: DeviceMonitor(device) for device in devices}
     
-    # Démarrer le thread de monitoring
-    monitor_thread = threading.Thread(
-        target=monitor,
-        args=(device_monitors, config),
-        daemon=True
-    )
-    monitor_thread.start()
+    monitors_threads:dict[str,Thread]={
+        name:
+            threading.Thread(
+                target=monitor_device,
+                args=(device_monitors[name],config),
+                daemon=True) 
+            for name in device_monitors 
+            }
+    
+    for name in monitors_threads:
+        monitors_threads[name].start()
     
      # Démarrer le thread de speech monitoring
     speech_monitor_thread = threading.Thread(
