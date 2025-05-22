@@ -376,10 +376,9 @@ def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
                 if  name in previous_statuses:
                     if not current_status==previous_statuses[name]: 
                         status_changed=True
-                else:
-                    status_incomplete=True
                 previous_statuses[name]=current_status
-        
+            else:
+                status_incomplete=True
         # Message vocal uniquement si changement
         if status_changed and not status_incomplete:
             down_devices = [m.device.name for m in device_monitors.values() if m.current_status==False]
@@ -396,10 +395,6 @@ def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
 
 
 def monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
-    #engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
-    #engine.setProperty('rate',config.speech_speed)
-    #engine.setProperty('volume',config.speech_volume)
-    #engine.setProperty('voice', 'french') 
     
     while True:
         start_time:float = time.time()
@@ -431,16 +426,6 @@ def monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
                     print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
                 
                 status_changes.append(device)
-        
-        # Message vocal uniquement si changement
-        #if status_changes:
-        #    down_devices = [d.name for d in devices if not device_monitors[d.name].current_status]
-        #    if down_devices:
-        #        message = f"{' , '.join(down_devices)} injoignable"
-        #    else:
-        #        message = "Tout est joignable"    
-        #    engine.say(message)
-        #    engine.runAndWait()
         
         elapsed = time.time() - start_time
         time.sleep(max(0, config.interval - elapsed))
