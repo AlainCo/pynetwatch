@@ -281,7 +281,6 @@ class NetworkMonitorApp(tk.Tk):
             try:
                 hwnd = win32gui.GetParent(self.winfo_id())
                 if not hwnd:
-                    print(f"_change_icon: Pas de fenetre parente ")
                     return
                 if self.current_icon_handle:
                     win32gui.DestroyIcon(self.current_icon_handle) #type: ignore
