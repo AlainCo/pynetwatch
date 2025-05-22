@@ -50,17 +50,22 @@ class Config:
         self.http_timeout = 3
         self.http_retry = 2
         self.update_interval=1000
-        self.log_file='pynetwatch.log'
+        self.log_file='nul:'
         self.devices_file='devices.json'
+        self.config_file='pynetwatch-config.json'
+        self.config_create=False;
 
         
-    def load_config_from_json(self, filename: str = "config.json") -> None:
+    def load_config_from_json(self, filename:str) -> None:
         """Charge les données du JSON dans les attributs de la classe."""
         file_path = Path(filename)
         
         # Crée le fichier JSON avec les valeurs par défaut s'il n'existe pas
         if not file_path.exists():
-            self._generate_default_config(file_path)
+            if self.config_create:
+                self._generate_default_config(file_path)
+            else:
+                exit(2)
         
         # Charge et applique les données du JSON
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -68,6 +73,7 @@ class Config:
             for key, value in data.items():
                 if hasattr(self, key):  # Ne met à jour que les attributs existants
                     setattr(self, key, value)
+       
 
     def _generate_default_config(self, file_path: Path) -> None:
         """Crée un fichier de configuration par défaut."""
@@ -89,7 +95,7 @@ class Config:
     def _parse_arg(self, arg: str) -> tuple[str, str]:
         """Extrait la clé et la valeur d'un argument."""
         key_value = arg[2:].split('=', 1)
-        return key_value[0].strip(), key_value[1].strip()
+        return key_value[0].strip().replace('-', '_'), key_value[1].strip()
 
     def _set_config_value(self, key: str, str_value: str) -> None:
         """Convertit et assigne la valeur en respectant le type d'origine."""
@@ -150,7 +156,7 @@ class DeviceMonitor:
         self.device: Device = device
         self.last_status: Optional[bool] = None
         self.downtime_start: Optional[float] = None  # Type float pour les timestamps
-        self.current_status: Optional[bool] = True
+        self.current_status: Optional[bool] = None
 
 class AlertData:
     def __init__(self,kind:str,device:Device,status:bool,time:float):
@@ -178,7 +184,7 @@ class NetworkMonitorApp(tk.Tk):
  
         # zone de logs
         self.log_frame = ttk.Frame(self)
-        self.log_text = tk.Text(self.log_frame, height=3, state='disabled')
+        self.log_text = tk.Text(self.log_frame, height=10, state='disabled')
         self.log_text.pack(fill=tk.BOTH, expand=True)
         
         # Bouton pour escamoter
@@ -204,7 +210,7 @@ class NetworkMonitorApp(tk.Tk):
             self.log_frame.pack_forget()
             self.toggle_btn.config(text="▲ Afficher les logs ▼")
         else:
-            self.log_frame.pack(fill=tk.Y, expand=True)
+            self.log_frame.pack(fill=tk.BOTH, expand=True)
             self.toggle_btn.config(text="▲ Masquer les logs ▼")
         self.log_visible = not self.log_visible        
         
@@ -305,10 +311,13 @@ def monitor(device_monitors:dict[str,DeviceMonitor], alert_queue:Queue[AlertData
             monitor.current_status = ok
             
             # Détection des changements d'état
-            if previous_status != ok:
+            if previous_status is None or previous_status != ok:
                 if ok:
                     downtime_duration = time.time() - monitor.downtime_start if monitor.downtime_start else 0
-                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
+                    if downtime_duration>0:
+                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
+                    else:
+                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} connecté")
                 else:
                     monitor.downtime_start = time.time()
                     print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
@@ -366,10 +375,14 @@ def load_devices_from_json(filename:str="devices.json")->list[Device]:
 if __name__ == "__main__":
     
     config:Config=Config()
-    config.load_config_from_json("pynetwatch-config.json")
-    config.load_config_from_cli_args()  # Applique les arguments de ligne de commande
+    #eventually reset the config_file from args with args 
+    config.load_config_from_cli_args(sys.argv[1:])
+    #load using config_file eventually changer by args
+    config.load_config_from_json(config.config_file)
+    #update fields with args 
+    config.load_config_from_cli_args(sys.argv[1:])
+
     
-    #if getattr(sys, 'frozen', False):
     sys.stdout = open(config.log_file, 'w')
     sys.stderr = sys.stdout
 
