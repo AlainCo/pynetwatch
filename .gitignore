@@ -15,4 +15,7 @@ __pycache__/
 .env
 secrets.py
 devices.json
+#fichiers locaux
+*.lnk
+#fichiers de test
 test_tkinter.py
