@@ -435,7 +435,7 @@ if __name__ == "__main__":
     config.load_config_from_cli_args(sys.argv[1:])
 
     
-    sys.stdout = open(config.log_file, 'w')
+    sys.stdout = open(config.log_file, 'a')
     sys.stderr = sys.stdout
 
     # Charger les périphériques depuis le fichier JSON
