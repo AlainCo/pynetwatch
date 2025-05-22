@@ -8,8 +8,7 @@ from queue import Queue
 import json
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk
-from tkinter import Text
+from tkinter import ttk,Text
 import pyttsx3 # type: ignore
 from pyttsx3.engine import Engine # type: ignore
 from icmplib import ping as icmp_ping # type: ignore
