@@ -18,7 +18,7 @@ import pyttsx3 # type: ignore
 from pyttsx3.engine import Engine # type: ignore
 from icmplib import ping as icmp_ping # type: ignore
 
-MAX_QUEUE_SIZE = 1000  # Évite l'explosion mémoire
+
 
 # pour les ressources pyinstaller
 def resource_path(relative_path):# type: ignore
@@ -64,6 +64,16 @@ class Config:
         self.config_file='pynetwatch-config.json'
         self.config_create=False
 
+    @staticmethod
+    def load():
+        config=Config()
+        #eventually reset the config_file from args with args 
+        config.load_config_from_cli_args(sys.argv[1:])
+        #load using config_file eventually changer by args
+        config.load_config_from_json(config.config_file)
+        #update fields with args 
+        config.load_config_from_cli_args(sys.argv[1:])
+        return config
 
         
     def load_config_from_json(self, filename:str) -> None:
@@ -237,7 +247,7 @@ class Device:
         self.failed_accelerate=failed_accelerate
         
     @staticmethod   
-    def load_devices_from_json(config:Config)->list[Device]:
+    def load(config:Config)->list[Device]:
         devices:list[Device] = []
         try:
             file_path = Path(config.devices_file)
@@ -273,12 +283,9 @@ class Device:
             print(f"Erreur de chargement: {str(e)}")
             return []
 
-
-class NetworkMonitorApp(tk.Tk):
-    def __init__(self, device_monitors:dict[str,DeviceMonitor], config:Config, *args:Any, **kwargs:Any):
-        super().__init__(*args, **kwargs)
-        
-        # Configuration initiale icones
+class IconManager:
+    def __init__(self,app:tk.Tk):
+        self.app=app
         self.current_icon = ""
         self.current_icon_handle=None
         self.icons = {
@@ -286,28 +293,65 @@ class NetworkMonitorApp(tk.Tk):
             "warn": self._get_icon_path("warn.ico"),
             "alert": self._get_icon_path("alert.ico")
         }
-
-        self.device_monitors = device_monitors
-        # Queue thread-safe pour les logs
-        self.log_queue:Queue[str] = queue.Queue()
         
+    def _get_icon_path(self, filename:str):
+        """Gère le chemin des ressources pour PyInstaller"""
+        if getattr(sys, 'frozen', False):
+            return os.path.join(sys._MEIPASS, "icons", filename) # type: ignore
+        return os.path.join("icons", filename)
+
+    def change_icon(self, icon_name:str):
+        """Change l'icône de la fenêtre et de la barre des tâches"""
+        if icon_name not in self.icons:
+            return
+        if self.current_icon == icon_name:
+            return
+        icon_path = self.icons[icon_name]
+        # Pour Windows
+        if sys.platform == "win32":
+            import win32gui
+            import win32con
+            try:
+                hwnd = win32gui.GetParent(self.app.winfo_id())
+                if not hwnd:
+                    return
+                if self.current_icon_handle:
+                    win32gui.DestroyIcon(self.current_icon_handle) #type: ignore
+                # Charger la nouvelle icône
+                self.current_icon_handle = win32gui.LoadImage(
+                    0, icon_path, win32con.IMAGE_ICON, 0, 0, 
+                    win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+                )
+                # Mise à jour des deux tailles d'icônes
+                for icon_type in [win32con.ICON_SMALL, win32con.ICON_BIG]:
+                    win32gui.SendMessage(
+                        hwnd,
+                        win32con.WM_SETICON,
+                        icon_type,
+                        self.current_icon_handle # type: ignore
+                    )
+                self.current_icon = icon_name
+            except Exception as e:
+                print(f"Erreur dans change_icon: {e}")
+
+class NetworkMonitorApp(tk.Tk):
+    def __init__(self, device_monitors:list[DeviceMonitor], log_manager:LogManager, config:Config,*args:Any, **kwargs:Any):
+        super().__init__(*args, **kwargs)
+        self.icon_manager=IconManager(self)
+        self.log_manager=log_manager
+        self.device_monitors = device_monitors
         # Configuration de l'interface
         self.title("Network Monitor")
         self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
         self.status_label.pack(side=tk.TOP)
-        
         self.tree = ttk.Treeview(self, columns=('Status', 'Downtime'), show='headings')
         self.tree.heading('Status', text='Statut')
         self.tree.heading('Downtime', text='Indisponible depuis')
         self.tree.pack(fill=tk.BOTH, expand=True)
-        
-
- 
         # zone de logs
         self.log_frame = ttk.Frame(self)
         self.log_text = tk.Text(self.log_frame, height=10, state='disabled',width=40)
         self.log_text.pack(fill=tk.BOTH, expand=True)
-        
         # Bouton pour escamoter
         self.toggle_btn = ttk.Button(
             self,
@@ -315,14 +359,8 @@ class NetworkMonitorApp(tk.Tk):
             command=self.toggle_logs
         )
         self.toggle_btn.pack(fill=tk.X,side=tk.BOTTOM)
-        
         self.log_visible = False
         self.log_frame.pack_forget()
-        
-        # Redirection vers la zone de logs
-        sys.stdout = self.LogProducer(sys.stdout, self.log_queue)
-        sys.stderr = self.LogProducer(sys.stderr, self.log_queue)
-        
         self.update_interval=1000
         self.update_display()
     
@@ -334,7 +372,121 @@ class NetworkMonitorApp(tk.Tk):
             self.log_frame.pack(fill=tk.BOTH, expand=True)
             self.toggle_btn.config(text="▲ Masquer les logs ▼")
         self.log_visible = not self.log_visible        
+    
+    def process_log_queue(self):
+        """Vide la queue de logs dans le widget (thread principal)"""
+        while True:
+            try:
+                msg = self.log_manager.log_queue.get_nowait()
+                self.log_text.configure(state='normal')
+                self.log_text.insert('end', msg + '\n')
+                self.log_text.see('end')
+                self.log_text.configure(state='disabled')
+            except queue.Empty:
+                break
+    
+    def update_display(self):
+        self.tree.delete(*self.tree.get_children())
+        any_down = False
+        important_down=False
+        for monitor in self.device_monitors:
+            if monitor.current_status is False:
+                any_down = True
+                if monitor.device.is_important:
+                    important_down=True
+                downtime = time.strftime("%H:%M:%S", time.localtime(monitor.downtime_start)) if monitor.downtime_start else "N/A"
+                self.tree.insert('', 'end', values=(monitor.device.name, downtime))
+        if important_down:
+            self.status_label.config(text="Problèmes graves détectés", foreground="red",font=('Helvetica', 18, 'bold'))
+            self.icon_manager.change_icon('alert')
+        else:
+            if any_down:
+                self.status_label.config(text="Problèmes détectés", foreground="orange",font=('Helvetica', 15, 'bold'))
+                self.icon_manager.change_icon('warn')
+            else:
+                self.status_label.config(text="Tout est joignable", foreground="green",font=('Helvetica', 10, 'normal'))
+                self.icon_manager.change_icon('ok')
+        self.process_log_queue()
+        self.after(self.update_interval, self.update_display)
+
+class SpeechMonitor:
+    def __init__(self,device_monitors:list[DeviceMonitor], config:Config):
+        self.device_monitors=device_monitors
+        self.config=config
+        self.engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
+        self.engine.setProperty('rate',config.speech_speed)
+        self.engine.setProperty('volume',config.speech_volume)
+        self.engine.setProperty('voice', 'french') 
+        self.previous_statuses:dict[str,bool]={}
+   
+    def speech_monitor(self):
+        status_incomplete=True
+        while True:
+            start_time:float = time.time()
+            status_changed=status_incomplete
+            status_incomplete=False
+            for monitor in self.device_monitors:
+                name=monitor.device.name
+                current_status=monitor.current_status
+                if current_status is not None:
+                    if  name in self.previous_statuses:
+                        if not current_status==self.previous_statuses[name]: 
+                            status_changed=True
+                    self.previous_statuses[name]=current_status
+                else:
+                    status_incomplete=True
+            # Message vocal uniquement si changement
+            if status_changed and not status_incomplete:
+                down_devices = [m.device.name for m in self.device_monitors if m.current_status==False]
+                if down_devices:
+                    message = f"{' , '.join(down_devices)} injoignable"
+                else:
+                    message = "Tout est joignable"
+                self.engine.say(message)
+                self.engine.runAndWait()
+            elapsed = time.time() - start_time
+            time.sleep(max(0.0, config.interval - elapsed))
+
+
+    def start(self):
+         # Démarrer le thread de speech monitoring
+        self.speech_monitor_thread = threading.Thread(
+            target=self.speech_monitor,
+            args=(),
+            daemon=True
+        )
+        self.speech_monitor_thread.start()
+
+class NetworkMonitor:
+    def __init__(self,devices:list[Device], config:Config):
+        self.config=config
+        self.device_monitors=[DeviceMonitor(device) for device in devices]
+        urllib3.disable_warnings()
+        
+    def start(self):
+        self.monitors_threads:list[Thread]=[
+                threading.Thread(
+                    target=monitor.run_monitor,
+                    args=(config,),
+                    daemon=True) 
+                for monitor in self.device_monitors 
+        ]
+        for thread in self.monitors_threads:
+            thread.start()
+            
+class LogManager:
+    def __init__(self,config:Config):
+        self.config=config
+         # Queue thread-safe pour les logs
+        self.log_queue:Queue[str] = queue.Queue()
+    def configure(self):
+        sys.stdout = open(config.log_file, 'a')
+        sys.stderr = sys.stdout
+        # Redirection vers la zone de logs
+        sys.stdout = self.LogProducer(sys.stdout, self.log_queue)
+        sys.stderr = self.LogProducer(sys.stderr, self.log_queue)
     class LogProducer:
+        MAX_QUEUE_SIZE = 1000  # Évite l'explosion mémoire
         def __init__(self, original_stream:TextIO, log_queue:Queue[str]):
             self.original_stream = original_stream
             self.log_queue = log_queue
@@ -342,183 +494,33 @@ class NetworkMonitorApp(tk.Tk):
         def write(self, message:str):
             self.original_stream.write(message)
             if message.strip():
-                if self.log_queue.qsize() < MAX_QUEUE_SIZE:
+                if self.log_queue.qsize() < self.MAX_QUEUE_SIZE:
                     self.log_queue.put(message.strip())
                 else:
                     pass
         def flush(self):
             pass
 
-    def process_log_queue(self):
-        """Vide la queue de logs dans le widget (thread principal)"""
-        while True:
-            try:
-                msg = self.log_queue.get_nowait()
-                self.log_text.configure(state='normal')
-                self.log_text.insert('end', msg + '\n')
-                self.log_text.see('end')
-                self.log_text.configure(state='disabled')
-            except queue.Empty:
-                break
- 
-            
-    def _get_icon_path(self, filename:str):
-        """Gère le chemin des ressources pour PyInstaller"""
-        if getattr(sys, 'frozen', False):
-            return os.path.join(sys._MEIPASS, "icons", filename) # type: ignore
-        return os.path.join("icons", filename)
-
-    def _change_icon(self, icon_name:str):
-        """Change l'icône de la fenêtre et de la barre des tâches"""
-        if icon_name not in self.icons:
-            return
-        if self.current_icon == icon_name:
-            return
-        
-        icon_path = self.icons[icon_name]
-        
-        # Pour Windows
-        
-        if sys.platform == "win32":
-            import win32gui
-            import win32con
-            try:
-                hwnd = win32gui.GetParent(self.winfo_id())
-                if not hwnd:
-                    return
-                if self.current_icon_handle:
-                    win32gui.DestroyIcon(self.current_icon_handle) #type: ignore
-                    
-                # Charger la nouvelle icône
-                self.current_icon_handle = win32gui.LoadImage(
-                    0, icon_path, win32con.IMAGE_ICON, 0, 0, 
-                    win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
-                )
-
-                # Mise à jour des deux tailles d'icônes
-                for icon_type in [win32con.ICON_SMALL, win32con.ICON_BIG]:
-                    win32gui.SendMessage(
-                        hwnd,
-                        win32con.WM_SETICON,
-                        icon_type,
-                        self.current_icon_handle # type: ignore
-                    )
-                self.current_icon = icon_name
-            except Exception as e:
-                print(f"Erreur dans _change_icon: {e}")
-    
-    def update_display(self):
-        
-        self.tree.delete(*self.tree.get_children())
-        any_down = False
-        important_down=False
-        
-        for monitor in self.device_monitors.values():
-            if monitor.current_status is False:
-                any_down = True
-                if monitor.device.is_important:
-                    important_down=True
-                downtime = time.strftime("%H:%M:%S", time.localtime(monitor.downtime_start)) if monitor.downtime_start else "N/A"
-                self.tree.insert('', 'end', values=(monitor.device.name, downtime))
-        
-        
-        if important_down:
-            self.status_label.config(text="Problèmes graves détectés", foreground="red",font=('Helvetica', 18, 'bold'))
-            self._change_icon('alert')
-        else:
-            if any_down:
-                self.status_label.config(text="Problèmes détectés", foreground="orange",font=('Helvetica', 15, 'bold'))
-                self._change_icon('warn')
-            else:
-                self.status_label.config(text="Tout est joignable", foreground="green",font=('Helvetica', 10, 'normal'))
-                self._change_icon('ok')
-        self.process_log_queue()
-        self.after(self.update_interval, self.update_display)
-
-def speech_monitor(device_monitors:dict[str,DeviceMonitor], config:Config):
-    engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
-    engine.setProperty('rate',config.speech_speed)
-    engine.setProperty('volume',config.speech_volume)
-    engine.setProperty('voice', 'french') 
-    
-    previous_statuses:dict[str,bool]={}
-    status_incomplete=True
-    
-    while True:
-        start_time:float = time.time()
-        status_changed=status_incomplete
-        status_incomplete=False
-        
-        for monitor in device_monitors.values():
-            name=monitor.device.name
-            current_status=monitor.current_status
-            if current_status is not None:
-                if  name in previous_statuses:
-                    if not current_status==previous_statuses[name]: 
-                        status_changed=True
-                previous_statuses[name]=current_status
-            else:
-                status_incomplete=True
-        # Message vocal uniquement si changement
-        if status_changed and not status_incomplete:
-            down_devices = [m.device.name for m in device_monitors.values() if m.current_status==False]
-            if down_devices:
-                message = f"{' , '.join(down_devices)} injoignable"
-            else:
-                message = "Tout est joignable"
-            
-            engine.say(message)
-            engine.runAndWait()
-        
-        elapsed = time.time() - start_time
-        time.sleep(max(0.0, config.interval - elapsed))
-
-
-
-
 if __name__ == "__main__":
-    urllib3.disable_warnings()
     
-    config:Config=Config()
-    #eventually reset the config_file from args with args 
-    config.load_config_from_cli_args(sys.argv[1:])
-    #load using config_file eventually changer by args
-    config.load_config_from_json(config.config_file)
-    #update fields with args 
-    config.load_config_from_cli_args(sys.argv[1:])
+    
+    config=Config.load()
 
-    sys.stdout = open(config.log_file, 'a')
-    sys.stderr = sys.stdout
+    log_manager=LogManager(config)
+    log_manager.configure();
 
     # Charger les périphériques depuis le fichier JSON
-    devices = Device.load_devices_from_json(config)
+    devices = Device.load(config)
     
     if not devices:
         print(f"Aucun périphérique chargé. Vérifiez le fichier {config.devices_file}")
         exit(1)
     
-    device_monitors:dict[str,DeviceMonitor] = {device.name: DeviceMonitor(device) for device in devices}
-    
-    monitors_threads:dict[str,Thread]={
-        name:
-            threading.Thread(
-                target=device_monitors[name].run_monitor,
-                args=(config,),
-                daemon=True) 
-            for name in device_monitors 
-            }
-    
-    for name in monitors_threads:
-        monitors_threads[name].start()
-    
-     # Démarrer le thread de speech monitoring
-    speech_monitor_thread = threading.Thread(
-        target=speech_monitor,
-        args=(device_monitors, config),
-        daemon=True
-    )
-    speech_monitor_thread.start()
-    
+    network_monitor=NetworkMonitor(devices,config)
+    network_monitor.start()
+    speech_monitor=SpeechMonitor(network_monitor.device_monitors, config)
+    speech_monitor.start()
+
     # Lancer l'interface graphique
-    app = NetworkMonitorApp(device_monitors, config)
+    app = NetworkMonitorApp(network_monitor.device_monitors, log_manager, config)
     app.mainloop()
