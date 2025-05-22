@@ -7,7 +7,7 @@ import time
 import tkinter as tk
 from tkinter import ttk
 from model import Config
-from business import DeviceMonitor,LogManager
+from business import NetworkMonitor,LogManager
 
 #gestionnaire de l'icone de l'application
 class IconManager:
@@ -18,7 +18,8 @@ class IconManager:
         self.icons = {
             "ok": self._get_icon_path("ok.ico"),
             "warn": self._get_icon_path("warn.ico"),
-            "alert": self._get_icon_path("alert.ico")
+            "alert": self._get_icon_path("alert.ico"),
+            "wait": self._get_icon_path("wait.ico"),
         }
         
     def _get_icon_path(self, filename:str):
@@ -63,11 +64,11 @@ class IconManager:
 
 # application graphique de surveilance
 class NetworkMonitorApp(tk.Tk):
-    def __init__(self, device_monitors:list[DeviceMonitor], log_manager:LogManager, config:Config,*args:Any, **kwargs:Any):
+    def __init__(self, network_monitor:NetworkMonitor, log_manager:LogManager, config:Config,*args:Any, **kwargs:Any):
         super().__init__(*args, **kwargs)
         self.icon_manager=IconManager(self)
         self.log_manager=log_manager
-        self.device_monitors = device_monitors
+        self.network_monitor = network_monitor
         # Configuration de l'interface
         self.title("Network Monitor")
         self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
@@ -115,15 +116,13 @@ class NetworkMonitorApp(tk.Tk):
     
     def update_display(self):
         self.tree.delete(*self.tree.get_children())
-        any_down = False
-        important_down=False
-        for monitor in self.device_monitors:
-            if monitor.current_status is False:
-                any_down = True
-                if monitor.device.is_important:
-                    important_down=True
-                downtime = time.strftime("%H:%M:%S", time.localtime(monitor.downtime_start)) if monitor.downtime_start else "N/A"
-                self.tree.insert('', 'end', values=(monitor.device.name, downtime))
+        network_report=self.network_monitor.get_report()
+        any_down = network_report.devices_down
+        important_down=network_report.devices_down_important
+        any_unknown=network_report.devices_unknown
+        for r in network_report.devices_down:
+            downtime = time.strftime("%H:%M:%S", time.localtime(r.downtime_start)) if r.downtime_start else "N/A"
+            self.tree.insert('', 'end', values=(r.device.name, downtime))
         if important_down:
             self.status_label.config(text="Problèmes graves détectés", foreground="red",font=('Helvetica', 18, 'bold'))
             self.icon_manager.change_icon('alert')
@@ -133,7 +132,10 @@ class NetworkMonitorApp(tk.Tk):
                 self.icon_manager.change_icon('warn')
             else:
                 self.status_label.config(text="Tout est joignable", foreground="green",font=('Helvetica', 10, 'normal'))
-                self.icon_manager.change_icon('ok')
+                if any_unknown:
+                    self.icon_manager.change_icon('wait')
+                else:
+                    self.icon_manager.change_icon('ok')
         self.process_log_queue()
         self.after(self.update_interval, self.update_display)
 

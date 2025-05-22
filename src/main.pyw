@@ -17,8 +17,8 @@ if __name__ == "__main__":
     network_monitor=NetworkMonitor(devices,config)
     network_monitor.start()
     #lancer le rapport audio de surveillance
-    speech_monitor=SpeechMonitor(network_monitor.device_monitors, config)
+    speech_monitor=SpeechMonitor(network_monitor, config)
     speech_monitor.start()
     # Lancer l'interface graphique
-    app = NetworkMonitorApp(network_monitor.device_monitors, log_manager, config)
+    app = NetworkMonitorApp(network_monitor, log_manager, config)
     app.mainloop()

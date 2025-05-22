@@ -1,6 +1,6 @@
 
-from model import Config
-from business import DeviceMonitor
+from model import Config,NetworkReport
+from business import NetworkMonitor
 
 from typing import Literal,Union,Optional,overload
 import time
@@ -28,8 +28,8 @@ class SpeechEngine(Engine):
         
 #gestionnaire de l'interface vocale de la surveillance
 class SpeechMonitor:
-    def __init__(self,device_monitors:list[DeviceMonitor], config:Config):
-        self.device_monitors=device_monitors
+    def __init__(self,network_monitor:NetworkMonitor, config:Config):
+        self.network_monitor=network_monitor
         self.config=config
         self.engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
         self.engine.setProperty('rate',config.speech_speed)
@@ -39,23 +39,20 @@ class SpeechMonitor:
    
     def speech_monitor(self):
         status_incomplete=True
+        previous_network_report=NetworkReport()
         while True:
             start_time:float = time.time()
             status_changed=status_incomplete
-            status_incomplete=False
-            for monitor in self.device_monitors:
-                name=monitor.device.name
-                current_status=monitor.current_status
-                if current_status is not None:
-                    if  name in self.previous_statuses:
-                        if not current_status==self.previous_statuses[name]: 
-                            status_changed=True
-                    self.previous_statuses[name]=current_status
-                else:
-                    status_incomplete=True
+            network_report=self.network_monitor.get_report()
+            if status_incomplete:
+                status_changed=True
+            else:
+                status_changed=((network_report.devices_up^previous_network_report.devices_up)|(network_report.devices_down^previous_network_report.devices_down))
+            status_incomplete=network_report.devices_unknown
+            
             # Message vocal uniquement si changement
             if status_changed and not status_incomplete:
-                down_devices = [m.device.name for m in self.device_monitors if m.current_status==False]
+                down_devices =[report.device.name for report in network_report.devices_down]
                 if down_devices:
                     message = f"{' , '.join(down_devices)} injoignable"
                 else:
@@ -63,7 +60,11 @@ class SpeechMonitor:
                 self.engine.say(message)
                 self.engine.runAndWait()
             elapsed = time.time() - start_time
-            time.sleep(max(0.0, self.config.interval - elapsed))
+            if status_incomplete:
+                time.sleep(1.0)
+            else:
+                time.sleep(max(0.0, self.config.interval - elapsed))
+            previous_network_report=network_report
 
     def start(self):
          # Démarrer le thread de speech monitoring

@@ -1,17 +1,13 @@
-
-from typing import Optional
 import requests
 import random
 import time
 from icmplib import ping as icmp_ping # type: ignore
-from model import Device,Config
+from model import Device,Config,DeviceReport
 #composant de surveillance d'un device
 class DeviceMonitor:
     def __init__(self, device: Device):
-        self.device: Device = device
-        self.last_status: Optional[bool] = None
-        self.downtime_start: Optional[float] = None  # Type float pour les timestamps
-        self.current_status: Optional[bool] = None
+        self.report=DeviceReport(device)
+        self.device=device
 
     def check_ping(self):
         if self.device.ip is None:
@@ -42,31 +38,30 @@ class DeviceMonitor:
         while True:
             start_time:float = time.time()
         
-            previous_status = self.current_status
-            device=self.device;
+            previous_status = self.report.current_status
             # Vérification du statut
             ok:bool = False
-            if device.ip:
+            if self.device.ip:
                 ok = self.check_ping()
-            if not ok and device.url:
+            if not ok and self.device.url:
                 ok = self.check_url()
-            self.current_status = ok
+            self.report.current_status = ok
             
             # Détection des changements d'état
             if previous_status is None or previous_status != ok:
                 if ok:
-                    downtime_duration = time.time() - self.downtime_start if self.downtime_start else 0
+                    downtime_duration = time.time() - self.report.downtime_start if self.report.downtime_start else 0
                     if downtime_duration>0:
-                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
+                        print(f"[{time.strftime('%H:%M:%S')}] {self.device.name} reconnecté (indisponible pendant {downtime_duration:.1f}s)")
                     else:
-                        print(f"[{time.strftime('%H:%M:%S')}] {device.name} connecté")
-                    self.downtime_start = None
+                        print(f"[{time.strftime('%H:%M:%S')}] {self.device.name} connecté")
+                    self.report.downtime_start = None
                 else:
-                    self.downtime_start = time.time()
-                    print(f"[{time.strftime('%H:%M:%S')}] {device.name} injoignable")
+                    self.report.downtime_start = time.time()
+                    print(f"[{time.strftime('%H:%M:%S')}] {self.device.name} injoignable")
             
             elapsed = time.time() - start_time
-            interval_effective=device.interval/device.accelerate;
-            if not self.current_status:
-                interval_effective/=device.failed_accelerate
+            interval_effective=self.device.interval/self.device.accelerate;
+            if not self.report.current_status:
+                interval_effective/=self.device.failed_accelerate
             time.sleep(max(0.0, interval_effective - elapsed))
