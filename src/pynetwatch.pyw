@@ -178,17 +178,19 @@ class NetworkMonitorApp(tk.Tk):
  
         # zone de logs
         self.log_frame = ttk.Frame(self)
-        self.log_text = tk.Text(self.log_frame, height=8, state='disabled')
+        self.log_text = tk.Text(self.log_frame, height=3, state='disabled')
         self.log_text.pack(fill=tk.BOTH, expand=True)
         
         # Bouton pour escamoter
         self.toggle_btn = ttk.Button(
             self,
-            text="▲ Masquer les logs ▼",
+            text="▲ Afficher les logs ▼",
             command=self.toggle_logs
         )
         self.toggle_btn.pack(fill=tk.X)
-        self.log_visible = True
+        
+        self.log_visible = False
+        self.log_frame.pack_forget()
         
         # Redirection vers la zone de logs
         sys.stdout = self.LogRedirectorGUI(sys.stdout, self.log_text)
@@ -197,6 +199,15 @@ class NetworkMonitorApp(tk.Tk):
         self.update_interval = config.update_interval
         self.update_display()
     
+    def toggle_logs(self):
+        if self.log_visible:
+            self.log_frame.pack_forget()
+            self.toggle_btn.config(text="▲ Afficher les logs ▼")
+        else:
+            self.log_frame.pack(fill=tk.Y, expand=True)
+            self.toggle_btn.config(text="▲ Masquer les logs ▼")
+        self.log_visible = not self.log_visible        
+        
     class LogRedirectorGUI:
         def __init__(self, original_stream:TextIO, text_widget:Text):
             self.original_stream = original_stream
@@ -216,16 +227,6 @@ class NetworkMonitorApp(tk.Tk):
             self.original_stream.flush()
     
  
-    def toggle_logs(self):
-        if self.log_visible:
-            self.log_frame.pack_forget()
-            self.toggle_btn.config(text="▲ Afficher les logs ▼")
-        else:
-            self.log_frame.pack(fill=tk.BOTH, expand=True)
-            self.toggle_btn.config(text="▲ Masquer les logs ▼")
-        self.log_visible = not self.log_visible        
-        
-        
 
     
     def update_display(self):
