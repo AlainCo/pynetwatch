@@ -6,7 +6,7 @@ from model import Device,Config,DeviceReport
 import paramiko
 import re
 
-#composant de surveillance d'un device
+#Device surveillance component
 class DeviceMonitor:
     def __init__(self, device: Device):
         self.report=DeviceReport(device)
@@ -37,18 +37,14 @@ class DeviceMonitor:
     def check_ssh(self):
         if self.device.ssh_host is None or self.device.ssh_user is None or self.device.ssh_command is None or self.device.ssh_key_file is None:
             return False
-        if self.device.ssh_retry is None:
-            return False
         i=0
         while i<self.device.ssh_retry:
             client=None
             stdin, stdout, stderr=(None,None,None)
             try:
-                # Création du client SSH
                 client = paramiko.SSHClient()
-                # Politique d'acceptation automatique de la clé d'hôte (à utiliser avec précaution)
+                # automatically add host key. use with precaution.
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                # Connexion au serveur
                 if self.device.ssh_obsolete:
                     disabled_algorithms={
                         'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512'],
@@ -70,8 +66,6 @@ class DeviceMonitor:
                 )
                 stdin, stdout, stderr = client.exec_command(self.device.ssh_command)
     
-                # Récupération des résultats
-                
                 stdout_text=stdout.read().decode()
                 stderr_text=stderr.read().decode()
                 text=f"{stdout_text}\n{stderr_text}"
@@ -105,14 +99,13 @@ class DeviceMonitor:
             return False
     
     def run_monitor(self,config:Config):
-        #décale les moment de démarrage pour éviter les rafales, au hasard dans 20% de l'intervalle
+        #offset starting time to avoid bursts
         start_delay=random.uniform(0.0,self.device.interval/5)
         time.sleep(start_delay)
         while True:
             start_time:float = time.time()
         
             previous_status = self.report.current_status
-            # Vérification du statut
             ok:bool = False
             if self.device.ssh_host:
                 ok = self.check_ssh()
@@ -122,7 +115,7 @@ class DeviceMonitor:
                 ok = self.check_url()
             self.report.current_status = ok
             
-            # Détection des changements d'état
+            # detect state change
             if previous_status is None or previous_status != ok:
                 if ok:
                     downtime_duration = time.time() - self.report.downtime_start if self.report.downtime_start else 0

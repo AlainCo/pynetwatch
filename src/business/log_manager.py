@@ -4,22 +4,21 @@ from queue import Queue
 import sys
 from model import Config
 
-#gestionnaire des logs, avec file d'attente pour l'IHM
+#log manager with a thread-save queue for GUI
 class LogManager:
     def __init__(self,config:Config):
         self.config=config
-         # Queue thread-safe pour les logs
         self.log_queue:Queue[str] = queue.Queue()
         
     def configure(self):
         sys.stdout = open(self.config.log_file, 'a')
         sys.stderr = sys.stdout
-        # Redirection vers la zone de logs
+        # Redirect logs to GUI
         sys.stdout = self.LogProducer(sys.stdout, self.log_queue)
         sys.stderr = self.LogProducer(sys.stderr, self.log_queue)
         
     class LogProducer:
-        MAX_QUEUE_SIZE = 1000  # Évite l'explosion mémoire
+        MAX_QUEUE_SIZE = 1000  # prevent memory explosion
         def __init__(self, original_stream:TextIO, log_queue:Queue[str]):
             self.original_stream = original_stream
             self.log_queue = log_queue

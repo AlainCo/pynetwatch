@@ -5,20 +5,23 @@ from ui import NetworkMonitorApp,SpeechMonitor
 
 # main
 if __name__ == "__main__":
+    #load config
     config=Config.load()
+    #configure log
     log_manager=LogManager(config)
     log_manager.configure()
-    # Charger les périphériques depuis le fichier JSON
+    #load devices
     devices = Device.load(config)
     if not devices:
-        print(f"Aucun périphérique chargé. Vérifiez le fichier {config.devices_file}")
+        print(f"No device loaded. Check file: {config.devices_file}")
         exit(1)
-    #lancer la surveillance
+    Device.save(devices,config)
+    #start network monitoring
     network_monitor=NetworkMonitor(devices,config)
     network_monitor.start()
-    #lancer le rapport audio de surveillance
+    #start voice thread
     speech_monitor=SpeechMonitor(network_monitor, config)
     speech_monitor.start()
-    # Lancer l'interface graphique
+    # Start GUI
     app = NetworkMonitorApp(network_monitor, log_manager, config)
     app.mainloop()

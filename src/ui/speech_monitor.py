@@ -8,7 +8,7 @@ import threading
 import pyttsx3 # type: ignore
 from pyttsx3.engine import Engine # type: ignore
 
-# facade typée de la synthèse vocale
+# typed facade fror pyttsx3 engine
 SpeechPropertyName = Literal['rate', 'volume', 'voice', 'pitch']
 SpeechPropertyValue = Union[int, float, str]
 class SpeechEngine(Engine):
@@ -26,7 +26,7 @@ class SpeechEngine(Engine):
     def runAndWait(self)->None:
         super().runAndWait()
         
-#gestionnaire de l'interface vocale de la surveillance
+#manager to make vocal message on status change
 class SpeechMonitor:
     def __init__(self,network_monitor:NetworkMonitor, config:Config):
         self.network_monitor=network_monitor
@@ -34,7 +34,7 @@ class SpeechMonitor:
         self.engine:SpeechEngine = pyttsx3.init()# type: ignore[assignment]
         self.engine.setProperty('rate',config.speech_speed)
         self.engine.setProperty('volume',config.speech_volume)
-        self.engine.setProperty('voice', 'french') 
+        self.engine.setProperty('voice', self.config.speech_voice) 
         self.previous_statuses:dict[str,bool]={}
    
     def speech_monitor(self):
@@ -49,13 +49,13 @@ class SpeechMonitor:
                 status_changed=report.changed_from(previous_report)
             status_incomplete=report.devices_unknown
             
-            # Message vocal uniquement si changement
+            # vocal message only if all devices are tested and if state have changed
             if status_changed and not status_incomplete:
                 down_devices =[report.device.name for report in report.devices_down]
                 if down_devices:
-                    message = f"{' , '.join(down_devices)} injoignable"
+                    message = f"{' , '.join(down_devices)} {self.config.speech_text_unreachable}"
                 else:
-                    message = "Tout est joignable"
+                    message = f"{self.config.speech_text_all_is_reachable}"
                 self.engine.say(message)
                 self.engine.runAndWait()
             elapsed = time.time() - start_time
@@ -66,7 +66,6 @@ class SpeechMonitor:
             previous_report=report
 
     def start(self):
-         # Démarrer le thread de speech monitoring
         self.speech_monitor_thread = threading.Thread(
             target=self.speech_monitor,
             args=(),

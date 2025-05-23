@@ -9,7 +9,7 @@ from tkinter import ttk
 from model import Config
 from business import NetworkMonitor,LogManager
 
-#gestionnaire de l'icone de l'application
+#application icon manager
 class IconManager:
     def __init__(self,app:tk.Tk):
         self.app=app
@@ -23,19 +23,19 @@ class IconManager:
         }
         
     def _get_icon_path(self, filename:str):
-        """Gère le chemin des ressources pour PyInstaller"""
+        """manage path to resources for PyInstaller"""
         if getattr(sys, 'frozen', False):
             return os.path.join(sys._MEIPASS, "icons", filename) # type: ignore
         return os.path.join("icons", filename)
 
     def change_icon(self, icon_name:str):
-        """Change l'icône de la fenêtre et de la barre des tâches"""
+        """Change icon for windows and taskbar"""
         if icon_name not in self.icons:
             return
         if self.current_icon == icon_name:
             return
         icon_path = self.icons[icon_name]
-        # Pour Windows
+        # for Windows only
         if sys.platform == "win32":
             import win32gui
             import win32con
@@ -45,12 +45,12 @@ class IconManager:
                     return
                 if self.current_icon_handle:
                     win32gui.DestroyIcon(self.current_icon_handle) #type: ignore
-                # Charger la nouvelle icône
+                # load new icon
                 self.current_icon_handle = win32gui.LoadImage(
                     0, icon_path, win32con.IMAGE_ICON, 0, 0, 
                     win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
                 )
-                # Mise à jour des deux tailles d'icônes
+                # update both sizes
                 for icon_type in [win32con.ICON_SMALL, win32con.ICON_BIG]:
                     win32gui.SendMessage(
                         hwnd,
@@ -62,26 +62,28 @@ class IconManager:
             except Exception as e:
                 print(f"Erreur dans change_icon: {e}")
 
-# application graphique de surveilance
+# GUI application
 class NetworkMonitorApp(tk.Tk):
     def __init__(self, network_monitor:NetworkMonitor, log_manager:LogManager, config:Config,*args:Any, **kwargs:Any):
         super().__init__(*args, **kwargs)
+        self.config=config
         self.icon_manager=IconManager(self)
         self.log_manager=log_manager
         self.network_monitor = network_monitor
-        # Configuration de l'interface
-        self.title("Network Monitor")
+        # GUI configuration
+        self.title(self.config.gui_title)
+        # status zone
         self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
         self.status_label.pack(side=tk.TOP)
         self.tree = ttk.Treeview(self, columns=('Status', 'Downtime'), show='headings')
         self.tree.heading('Status', text='Statut')
         self.tree.heading('Downtime', text='Indisponible depuis')
         self.tree.pack(fill=tk.BOTH, expand=True)
-        # zone de logs
+        # log zone
         self.log_frame = ttk.Frame(self)
         self.log_text = tk.Text(self.log_frame, height=10, state='disabled',width=40)
         self.log_text.pack(fill=tk.BOTH, expand=True)
-        # Bouton pour escamoter
+        # button to show/hode
         self.toggle_btn = ttk.Button(
             self,
             text="▲ Afficher les logs ▼",
@@ -90,6 +92,7 @@ class NetworkMonitorApp(tk.Tk):
         self.toggle_btn.pack(fill=tk.X,side=tk.BOTTOM)
         self.log_visible = False
         self.log_frame.pack_forget()
+        # start updating regularly
         self.update_interval=1000
         self.update_display()
     
@@ -103,7 +106,6 @@ class NetworkMonitorApp(tk.Tk):
         self.log_visible = not self.log_visible        
     
     def process_log_queue(self):
-        """Vide la queue de logs dans le widget (thread principal)"""
         while True:
             try:
                 msg = self.log_manager.log_queue.get_nowait()

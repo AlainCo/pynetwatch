@@ -5,7 +5,7 @@ import urllib3
 from model import Config,Device,NetworkReport
 from business import DeviceMonitor
 
-# gestionnaire des thread de surveillances réseaux
+# manage all device monitoring threads
 class NetworkMonitor:
     def __init__(self,devices:list[Device], config:Config):
         self.config=config
