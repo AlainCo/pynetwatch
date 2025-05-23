@@ -43,8 +43,6 @@ class Device:
             if hasattr(self, key):  # Ne met à jour que les attributs existants
                 setattr(self, key, value)
 
-        
-        
     @staticmethod   
     def load(config:Config)->list[Device]:
         devices:list[Device] = []
@@ -52,15 +50,12 @@ class Device:
             file_path = Path(config.devices_file)
             if not file_path.exists():
                 raise FileNotFoundError(f"Fichier {config.devices_file} introuvable")
-            
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                
             for item in data:
                 if 'name' not in item:
                     print(f"Invalid Device entry, missing 'name': {item}")
                     continue
-                    
                 devices.append(
                     Device(
                         item,
@@ -84,9 +79,9 @@ class Device:
                 if not attr.startswith('__') and hasattr(device, attr):
                     item[attr]= getattr(device, attr)
             data.append(item)
-        if config.device_file_out:
+        if config.devices_file_out:
             try:
-                file_path = Path(config.device_file_out)
+                file_path = Path(config.devices_file_out)
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=4)
             except Exception as e:

@@ -10,7 +10,7 @@ class Config:
         self.config_file='pynetwatch-config.json'
         self.config_create=False
         self.devices_file='devices.json'
-        self.device_file_out='nul:'
+        self.devices_file_out='nul:'
         self.log_file='nul:'
         self.speech_speed = 140
         self.speech_volume=1.0
@@ -40,7 +40,7 @@ class Config:
         self.ssh_key_file='ssh.key'
         self.ssh_key_password='password'
         self.ssh_retry=1
-        self.ssh_timeout=3
+        self.ssh_timeout=10
         self.ssh_decelerate=10.0
         self.ssh_failed_accelerate=10.0
         self.ssh_obsolete=False
