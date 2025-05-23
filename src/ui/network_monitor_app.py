@@ -73,11 +73,11 @@ class NetworkMonitorApp(tk.Tk):
         # GUI configuration
         self.title(self.config.gui_title)
         # status zone
-        self.status_label = ttk.Label(self, text="Initialisation", foreground="green")
+        self.status_label = ttk.Label(self, text="...", foreground="green")
         self.status_label.pack(side=tk.TOP)
         self.tree = ttk.Treeview(self, columns=('Status', 'Downtime'), show='headings')
-        self.tree.heading('Status', text='Statut')
-        self.tree.heading('Downtime', text='Indisponible depuis')
+        self.tree.heading('Status', text=config.gui_heading_status)
+        self.tree.heading('Downtime', text=config.gui_heading_downtime)
         self.tree.pack(fill=tk.BOTH, expand=True)
         # log zone
         self.log_frame = ttk.Frame(self)
@@ -86,7 +86,7 @@ class NetworkMonitorApp(tk.Tk):
         # button to show/hode
         self.toggle_btn = ttk.Button(
             self,
-            text="▲ Afficher les logs ▼",
+            text=f"▲ {self.config.gui_button_show_logs} ▼",
             command=self.toggle_logs
         )
         self.toggle_btn.pack(fill=tk.X,side=tk.BOTTOM)
@@ -99,10 +99,10 @@ class NetworkMonitorApp(tk.Tk):
     def toggle_logs(self):
         if self.log_visible:
             self.log_frame.pack_forget()
-            self.toggle_btn.config(text="▲ Afficher les logs ▼")
+            self.toggle_btn.config(text=f"▲ {self.config.gui_button_show_logs} ▼")
         else:
             self.log_frame.pack(fill=tk.BOTH, expand=True)
-            self.toggle_btn.config(text="▲ Masquer les logs ▼")
+            self.toggle_btn.config(text=f"▲ {self.config.gui_button_hide_logs} ▼")
         self.log_visible = not self.log_visible        
     
     def process_log_queue(self):
@@ -123,21 +123,22 @@ class NetworkMonitorApp(tk.Tk):
         important_down=network_report.devices_down_important
         any_unknown=network_report.devices_unknown
         for r in network_report.devices_down:
-            downtime = time.strftime("%H:%M:%S", time.localtime(r.downtime_start)) if r.downtime_start else "N/A"
+            downtime = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(r.downtime_start)) if r.downtime_start else "N/A"
             self.tree.insert('', 'end', values=(r.device.name, downtime))
         if important_down:
-            self.status_label.config(text="Problèmes graves détectés", foreground="red",font=('Helvetica', 18, 'bold'))
+            self.status_label.config(text=f"{self.config.gui_message_status_alert}", foreground="red",font=('Helvetica', 18, 'bold'))
             self.icon_manager.change_icon('alert')
         else:
             if any_down:
-                self.status_label.config(text="Problèmes détectés", foreground="orange",font=('Helvetica', 15, 'bold'))
+                self.status_label.config(text=f"{self.config.gui_message_status_warn}", foreground="orange",font=('Helvetica', 15, 'bold'))
                 self.icon_manager.change_icon('warn')
             else:
-                self.status_label.config(text="Tout est joignable", foreground="green",font=('Helvetica', 10, 'normal'))
+                self.status_label.config(text=f"{self.config.gui_message_status_ok}", foreground="green",font=('Helvetica', 10, 'normal'))
                 if any_unknown:
                     self.icon_manager.change_icon('wait')
                 else:
                     self.icon_manager.change_icon('ok')
         self.process_log_queue()
+        #reschedule an update of the GUI
         self.after(self.update_interval, self.update_display)
 

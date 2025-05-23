@@ -15,11 +15,16 @@
 * check if IPV6 connectivity is OK, as much as IPV4, pinging/getting google services, my box...
 * check if my company VPN site is up
 
+# Internationalization :
+* you can change the voice language 
+* you can change the voice messages
+* you can change the log message
+* you can change the GUI labels
+
 # TODO:
-* vocal message and GUI are in French (Just add field in Config)
-* reading json into Device, and also setting default values from Config, could be made more automatic
-* I should add samples for Config and Device json
-* I should make a documentation for for Config and Device json at least 
+* Add samples for Config and Device json
+* Documentation for for Config and Device json
+* General documentation
 
 # Disclaimer: 
 * I'm an old programmer (Java, C/C++, and many scripting languages), but a rookie in Python

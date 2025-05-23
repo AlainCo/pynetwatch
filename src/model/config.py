@@ -17,7 +17,19 @@ class Config:
         self.speech_voice='english'
         self.speech_text_all_is_reachable='all is reachable'
         self.speech_text_unreachable='unreachable'
+        self.log_message_reconnected='reconnected'
+        self.log_message_unreachable_for='unavailable for'
+        self.log_message_reachable='reachable'
+        self.log_message_unreachable='unreachable'
         self.gui_title='Network Monitor'
+        self.gui_heading_status='Status'
+        self.gui_heading_downtime="Downtime"
+        self.gui_button_show_logs="Show logs"
+        self.gui_button_hide_logs="Hide logs"
+        self.gui_message_status_alert="Serious problems detected"
+        self.gui_message_status_warn="Minor problems detected"
+        self.gui_message_status_ok="All is OK"
+        
         self.interval = 10.0
         self.failed_accelerate=1.0
         self.accelerate=1.0
