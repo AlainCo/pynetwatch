@@ -1,0 +1,84 @@
+[
+    {
+        "name": "My Box",
+        "ip": "192.168.0.254",
+        "url":"http://192.168.0.254/favicon.ico",
+        "is_important": true,
+        "accelerate":3,
+        "ping_count":5
+    },
+     {
+        "name": "IP V4 Box",
+        "ip": "1.2.3.4",
+        "url":"https://1.2.3.4:12345/favicon.ico",
+        "is_important": true,
+        "accelerate":3,
+        "ping_count":10
+    },
+    {
+        "name": "IP V6 Box",
+        "ip": "[2a01:abc:def:1234::1]",
+        "url":"https://[2a01:abc:def:1234::1]:12345/favicon.ico",
+        "is_important": false,
+        "accelerate":3,
+        "ping_count":10
+    },
+    {
+        "name": "IP V6",
+        "ip": "ipv6.google.com",
+        "url":"http://ipv6.google.com/favicon.ico",
+        "is_important": false,
+        "accelerate":0.2,
+        "failed_accelerate":10,
+        "ping_count":10
+    },
+    {
+        "name": "IP V4",
+        "ip": "ipv4.google.com",
+        "url":"http://ipv4.google.com/favicon.ico",
+        "is_important": true,
+        "accelerate":0.5,
+        "ping_count":5
+    },
+    {
+        "name": "OpenWRT router",
+        "ip": "192.168.0.249",
+        "url":"http://192.168.0.249",
+        "is_important": true,
+        "accelerate":3,
+        "ping_count":5
+    },
+     {
+        "name": "WiFi Openwrt",
+        "ssh_host": "192.168.0.249",
+        "ssh_user":"root",
+        "ssh_command":" ubus call network.wireless status | jsonfilter -e '@[@.up=true].config.hwmode'",
+        "ssh_pattern_required":["11g","11a"],
+        "is_important": false
+    },
+     {
+        "name": "Disque Openwrt",
+        "ssh_host": "192.168.0.249",
+        "ssh_user":"root",
+        "ssh_command":" mount",
+        "ssh_pattern_required":["/mnt/data1","/mnt/data2"],
+        "is_important": false
+    },
+    {
+        "name": "Serveur Sharecenter",
+        "ip": "192.168.0.245",
+        "url":"http://192.168.0.245/web/images/logo.png",
+        "is_important": false,
+        "accelerate":0.5,
+        "ping_count":10
+    },
+    {
+        "name": "Disque Sharecenter",
+        "ssh_host": "192.168.0.245",
+        "ssh_user":"root",
+        "ssh_command":"mount",
+        "ssh_obsolete":true,
+        "ssh_pattern_required":["/dev/sda2","/dev/sdb2","/dev/sda4","/dev/sdb4"],
+        "is_important": false
+    }
+]
