@@ -131,7 +131,6 @@ an example is in /samples/devices.json
 * `ssh_obsolete` : flag to prevent modern cryptographic algorithms, to work with old SSH servers
 
 # TODO:
-* Documentation for Config and Device json
 * General documentation
 
 # Disclaimer: 
