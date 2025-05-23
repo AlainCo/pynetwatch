@@ -25,6 +25,7 @@ class LogManager:
             
         def write(self, message:str):
             self.original_stream.write(message)
+            self.original_stream.flush()
             if message.strip():
                 if self.log_queue.qsize() < self.MAX_QUEUE_SIZE:
                     self.log_queue.put(message.strip())
