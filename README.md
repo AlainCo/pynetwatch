@@ -22,8 +22,7 @@
 * you can change the GUI labels
 
 # TODO:
-* Add samples for Config and Device json
-* Documentation for for Config and Device json
+* Documentation for Config and Device json
 * General documentation
 
 # Disclaimer: 
