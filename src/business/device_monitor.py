@@ -62,7 +62,8 @@ class DeviceMonitor:
                     gss_auth=False,
                     gss_kex=False,
                     compress=True,
-                    disabled_algorithms=disabled_algorithms
+                    disabled_algorithms=disabled_algorithms,
+                    timeout=self.device.ssh_timeout
                 )
                 stdin, stdout, stderr = client.exec_command(self.device.ssh_command)
     
