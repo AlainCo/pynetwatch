@@ -9,6 +9,9 @@
 * GUI propose the list of device that are down
 * GUI propose to show the logs, which contain the history of up and down devices
 * icon is changed depending on the state of the supervision
+* some devices are declared "important". 
+ * if only "non important" devices are down, the icon is yellow warning. 
+ * if any important device is down, the icon is red alert.
 
 ## It's just a tool for my home. I could for example:
 * supervise with ping/http my routers, my box, my NAS, my camera, my wifi printer
