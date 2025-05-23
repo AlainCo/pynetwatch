@@ -120,13 +120,13 @@ class DeviceMonitor:
                 if ok:
                     downtime_duration = time.time() - self.report.downtime_start if self.report.downtime_start else 0
                     if downtime_duration>0:
-                        print(f"[{time.strftime('%H:%M:%S')}] {self.device.name} {config.log_message_reconnected} ({config.log_message_unreachable_for} {downtime_duration:.1f}s)")
+                        print(f"[{time.strftime('%Y/%m/%d %H:%M:%S')}] {self.device.name} {config.log_message_reconnected} ({config.log_message_unreachable_for} {downtime_duration:.1f}s)")
                     else:
-                        print(f"[{time.strftime('%H:%M:%S')}] {self.device.name} {config.log_message_reachable}")
+                        print(f"[{time.strftime('%Y/%m/%d %H:%M:%S')}] {self.device.name} {config.log_message_reachable}")
                     self.report.downtime_start = None
                 else:
                     self.report.downtime_start = time.time()
-                    print(f"[{time.strftime('%H:%M:%S')}] {self.device.name} {config.log_message_unreachable}")
+                    print(f"[{time.strftime('%Y/%m/%d %H:%M:%S')}] {self.device.name} {config.log_message_unreachable}")
             
             elapsed = time.time() - start_time
             interval_effective=self.device.interval/self.device.accelerate
