@@ -16,14 +16,9 @@ dist/
 build/
 # Fichiers sensibles (mots de passe, clés API)
 .env
-secrets.py
-devices.json
 
 #fichiers locaux
 *.lnk
 
-#fichiers de test
-test_tkinter.py
-pynetwatch-config.json
-
-device-out.json
+#fichiers personnels
+/perso
