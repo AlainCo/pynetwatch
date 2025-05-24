@@ -1,0 +1,22 @@
+{
+	"log_file": "pynetwatch.log",
+	"devices_file": "devices.json",
+    "devices_file_out":"nul:",
+    "speech_speed": 120,
+    "speech_volume": 1.0,
+    "speech_voice":"english",
+    "interval": 30,
+    "accelerate":1.0,
+    "failed_accelerate":4.0,
+    "ssh_decelerate":10.0,
+    "ssh_failed_accelerate":10.0,
+    "ping_count": 2,
+    "ping_timeout": 1,
+    "http_timeout": 3,
+    "http_retry":2,
+    "ssh_key_file":"mysshkeys.ppk",
+    "ssh_key_password":"password",
+    "ssh_obsolete":false,
+    "ssh_retry":2,
+	"ssh_timeout":10
+}

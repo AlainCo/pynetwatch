@@ -43,9 +43,20 @@ an example is in /samples/config-french.json with localization as French.
 ### Speech parameterization and internationalization
 * `speech_speed` : speed of vocalization (standard is 200, I prefer 150)
 * `speech_volume` : speech volume (as a flow, max is 1.0)
-* `speech_voice` : speech language
+* `speech_voice` : speech voice selector. 
 * `speech_text_all_is_reachable` : message when all is reachable
 * `speech_text_unreachable` : message after the list of unreachable devices
+
+Settng `speech_voice` is not direct. the text is compared with the id, the name, the languages of each **pyttsx3** voice, then if the value can be found inside id or name. puting the language name like french or english will often work, else you can put the nickname of the voice, like Hortense,Zora or David, or even the mirosoft code prefix like TTS_MS_FR-FR. On my French computer I have found those voices:
+    * name=`Microsoft Hortense Desktop - French` id=`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_FR-FR_HORTENSE_11.0`
+    * name=`Microsoft Zira Desktop - English (United States)` id=`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0`
+    * name=`Microsoft David Desktop - English (United States)` id=`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0`
+In my case those `speech_voice` selectors would have worked:
+* `David`
+* `TTS_MS_EN-US` (it would have selecte the firsy voice matching this text: Zira
+* `English`
+* `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0`
+* `Microsoft Zira Desktop - English (United States)`
 
 ### Log internationalization
 * `log_message_reconnected` : text when a devices is reconnected
@@ -294,6 +305,7 @@ pyNetWatch.exe --config-file=%~dp0perso\config.json  --config-create=true --log-
 The idea is to change the pathname of the config file to force creation of the config file if missing and set the path of the log file...
 
 # TODO:
+* make devices.json path relative to config path
 * Find Todo
 
 # Disclaimer: 
