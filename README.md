@@ -48,13 +48,13 @@ an example is in /samples/config-french.json with localization as French.
 * `speech_text_all_is_reachable` : message when all is reachable
 * `speech_text_unreachable` : message after the list of unreachable devices
 
-Settng `speech_voice` is not direct. the text is compared with the id, the name, the languages of each **pyttsx3** voice, then if the value can be found inside id or name. puting the language name like french or english will often work, else you can put the nickname of the voice, like Hortense,Zora or David, or even the mirosoft code prefix like TTS_MS_FR-FR. On my French computer I have found those voices:
+Settng `speech_voice` is not direct. the text is compared with the id, the name, the languages of each **pyttsx3** voice, then if the value can be found inside id or name. puting the language name like french or english will often work, else you can put the nickname of the voice, like Hortense,Zora or David, or even the microsoft code prefix like TTS_MS_FR-FR. On my French computer I have found those voices:
     * name=`Microsoft Hortense Desktop - French` id=`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_FR-FR_HORTENSE_11.0`
     * name=`Microsoft Zira Desktop - English (United States)` id=`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0`
     * name=`Microsoft David Desktop - English (United States)` id=`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0`
 In my case those `speech_voice` selectors would have worked:
 * `David`
-* `TTS_MS_EN-US` (it would have selecte the firsy voice matching this text: Zira
+* `TTS_MS_EN-US` (it would have selected the first voice matching this text: Zira
 * `English`
 * `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0`
 * `Microsoft Zira Desktop - English (United States)`
@@ -67,15 +67,14 @@ In my case those `speech_voice` selectors would have worked:
 
 ### GUI internationalization
 * `gui_title` : windows title
-* `gui_heading_status` : windows title
-* `gui_heading_downtime` : windows title
-* `gui_button_show_logs` : windows title
-* `gui_button_hide_logs` : windows title
-* `gui_message_status_alert` : windows title
-* `gui_message_status_warn` : windows title
-* `gui_message_status_ok` : windows title
-* `gui_title` : windows title
-* `gui_title` : windows title
+* `gui_heading_status` : header for the colum of status
+* `gui_heading_downtime` : header for the colum of downtime
+* `gui_button_show_logs` : title of the button to show logs
+* `gui_button_hide_logs` : title of the button to hide logs
+* `gui_message_status_alert` : message when important devices are down
+* `gui_message_status_warn` : message when only non important devices are down
+* `gui_message_status_ok` : message when all is OK
+
 
 ### Default values for Device
 * `interval` : interval between devices tests. 
