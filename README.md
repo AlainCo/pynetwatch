@@ -110,7 +110,7 @@ an example is in /samples/devices.json
 * `name` : name of the device, for GUI, log and speech
 * `is_important` : flag to tell that this devices is important
 
-### changing interval
+### Changing interval
 * `interval` : interval between devices tests. Prefer to keep it by defat from Config, and change accelerate/decelerate values.
 * `accelerate` : factor to reduce interval. 
 * `failed_accelerate` : factor to reduce interval even more when device is down.
@@ -151,7 +151,7 @@ an example is in /samples/devices.json
 
 The first work is to create the config JSON file, and then the device JSON file.
 
-## create config.json file
+## Create config.json file
 The filename for the config file is by default: `pynetwatch-config.json` in the current folder, but you can set it via a parameter `--config-file=folder\myconfigfilename.json`
 Get inspired by the samples in `samples`and use the documentation above.
 
@@ -166,14 +166,14 @@ The others fields are set by default to reasonable values, for English language,
 
 Note that the path to `devices_files` like `log_file` or `devices_file_out` are relative to the config file folder... 
 
-## create devices.json
+## Create devices.json
 The filename of the devices.json file is defined in the config file, or else it will be assumed to be `devices.json`.
 Get inspired by the samples in `samples`and use the documentation above.
 
 It is a simple list of JSON objects, abd the fields are documented above. values set in the config file are used as default values in device object.
 
 Here are some common use case I've tested at home:
-### testing with ping
+### Testing with ping
 ```json
 [
     {
@@ -188,7 +188,7 @@ Here are some common use case I've tested at home:
 I ask to ping My Box, at most 5 times, with default timeout (1 second, set in the config.json), givens it's address (it can be a DNS alias).
 With `accelerate`I ask to ping it 3 times more frequently that the base frequency set by `interval` in the config. I do that because I have no fear to spam by own devices. For a public machine, I may do the opposite, set `accelerate` to 0.1 to prefent annoying the public server.
 
-### testing with HTTP
+### Testing with HTTP
 ```json
 [
     {
@@ -201,7 +201,7 @@ With `accelerate`I ask to ping it 3 times more frequently that the base frequenc
 ```
 I ask to test my HTTP server. I use the default `http_timeout` set to 3 in my config.json, but I may change it for a slow server.
 
-### testing with IPV6
+### Testing with IPV6
 ```json
 [
     {
@@ -227,7 +227,7 @@ I ask to test my HTTP server. I use the default `http_timeout` set to 3 in my co
 ```
 no problem using IPV6 adresses for ping or HTTP
 
-### testing public services, like google 
+### Testing public services, like google 
 
 ```
 [
@@ -249,7 +249,7 @@ no problem using IPV6 adresses for ping or HTTP
 ```
 It's easy to test Internet connectivity, in IPV4 and IPV6. Note that I reduce the frequency of test not to annoy google servers.
 
-### checking that OpenWRT router's WiFi radio are both UP
+### Checking that OpenWRT router's WiFi radio are both UP
 
 ```
 [
@@ -279,7 +279,7 @@ By defaul, the polling via SSH command is set to be 10 times less frequent than 
 However when a SSH test is failed, I accelerate to normal interval, to knwo quickly when it is back up.
 Note also that SSH ciphers are set to normal (not `ssh_obsolete`)
 
-### checking mounted volumes on an old NAS
+### Checking mounted volumes on an old NAS
 ```
 [
     {
@@ -296,7 +296,7 @@ Note also that SSH ciphers are set to normal (not `ssh_obsolete`)
 
 Here I check that the disk of my old NAS are well mounted. I have activated `ssh_obsolete` so the ciphers are old and recognized by this old NAS.
 
-## launch pyNetWatch
+## Launch pyNetWatch
 Then you have to launch `pyNetWatch.exe` generated in `dist\pyNetWatch.exe`
 You can add parameters as explained above, to overload the values in the config file, or by default. 
 The name of parameters is simply the name of the json fields, replacing `_` by `--`with the usual `--`prefix, and the `=` separator with the value afterward.
