@@ -5,6 +5,7 @@
     "speech_speed": 150,
     "speech_volume": 1.0,
     "speech_voice":"french",
+    "speech_interval":10.0,
     "speech_text_all_is_reachable":"tout est joignable",
     "speech_text_unreachable":"injoignable",
     "log_message_reconnected":"reconnecté",

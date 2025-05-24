@@ -12,6 +12,7 @@ class Config:
         self.devices_file='devices.json'
         self.devices_file_out='nul:'
         self.log_file='nul:'
+        self.speech_interval=10.0
         self.speech_speed = 140
         self.speech_volume=1.0
         self.speech_voice='english'

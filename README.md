@@ -41,6 +41,7 @@ an example is in /samples/config-french.json with localization as French.
 * `devices_file_out` : path to write loaded devices into (for debug. set empty or `nul:` to prevent this). Path is relative to the folder where the config file is.
 
 ### Speech parameterization and internationalization
+* `speech_interval` : interval between vocal messages
 * `speech_speed` : speed of vocalization (standard is 200, I prefer 150)
 * `speech_volume` : speech volume (as a flow, max is 1.0)
 * `speech_voice` : speech voice selector. 

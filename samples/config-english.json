@@ -5,6 +5,7 @@
     "speech_speed": 120,
     "speech_volume": 1.0,
     "speech_voice":"english",
+    "speech_interval":10.0,
     "interval": 30,
     "accelerate":1.0,
     "failed_accelerate":4.0,
