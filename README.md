@@ -36,9 +36,9 @@ This json file determines
 an example is in /samples/config-french.json with localization as French.
 
 ### Global settings :
-* `log_file` : the log file to writ to (set `nul:` for no log file)
-* `devices_file` : path of the devices.json to load
-* `devices_file_out` : path to write loaded devices into (for debug. set empty or `nul:` to prevent this)
+* `log_file` : the log file to writ to (set `nul:` for no log file). Path is relative to the folder where the config file is.
+* `devices_file` : path of the devices.json to load. Path is relative to the folder where the config file is.
+* `devices_file_out` : path to write loaded devices into (for debug. set empty or `nul:` to prevent this). Path is relative to the folder where the config file is.
 
 ### Speech parameterization and internationalization
 * `speech_speed` : speed of vocalization (standard is 200, I prefer 150)
@@ -155,13 +155,16 @@ The first work is to create the config JSON file, and then the device JSON file.
 The filename for the config file is by default: `pynetwatch-config.json` in the current folder, but you can set it via a parameter `--config-file=folder\myconfigfilename.json`
 Get inspired by the samples in `samples`and use the documentation above.
 
-in the JSON config file you first need to define the name of the "device_file", or else it will be assumed to be `devices.json`
+in the JSON config file you first need to define the name of the "device_file", or else it will be assumed to be `devices.json`. 
 ```json
 {
-	"devices_file": "perso/devices.json"
+	"devices_file": "devices.json"
 }
 ```
+
 The others fields are set by default to reasonable values, for English language, but you will have to adjust them for your needs...
+
+Note that the path to `devices_files` like `log_file` or `devices_file_out` are relative to the config file folder... 
 
 ## create devices.json
 The filename of the devices.json file is defined in the config file, or else it will be assumed to be `devices.json`.

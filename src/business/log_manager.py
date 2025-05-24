@@ -1,4 +1,5 @@
 from typing import TextIO
+from pathlib import Path
 import queue
 from queue import Queue
 import sys
@@ -11,7 +12,8 @@ class LogManager:
         self.log_queue:Queue[str] = queue.Queue()
         
     def configure(self):
-        sys.stdout = open(self.config.log_file, 'a')
+        file_path = Path(self.config.config_folder,self.config.log_file)
+        sys.stdout = open(file_path, 'a')
         sys.stderr = sys.stdout
         # Redirect logs to GUI
         sys.stdout = self.LogProducer(sys.stdout, self.log_queue)

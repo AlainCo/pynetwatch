@@ -48,22 +48,21 @@ class Config:
     @staticmethod
     def load():
         config=Config()
-        #eventually reset the config_file from args with args 
-        config.load_config_from_cli_args(sys.argv[1:])
-        #load using config_file eventually changer by args
-        config.load_config_from_json(config.config_file)
-        #update fields with args 
-        config.load_config_from_cli_args(sys.argv[1:])
+        #eventually reset the config_file from args 
+        config.load_from_cli_args(sys.argv[1:])
+        #load using config_file eventually changed by args
+        config.load_from_json(config.config_file)
+        #update fields from args 
+        config.load_from_cli_args(sys.argv[1:])
         return config
         
-    def load_config_from_json(self, filename:str) -> None:
-        """Charge les données du JSON dans les attributs de la classe."""
+    def load_from_json(self, filename:str) -> None:
         file_path = Path(filename)
-        
+        self.config_folder=file_path.parent
         # create config file if not exist and "config_create"  is true
         if not file_path.exists():
             if self.config_create:
-                self._generate_default_config(file_path)
+                self.save_as_json(file_path)
             else:
                 exit(2)
         
@@ -74,14 +73,12 @@ class Config:
                 if hasattr(self, key):  # Ne met à jour que les attributs existants
                     setattr(self, key, value)
 
-    def _generate_default_config(self, file_path: Path) -> None:
-        """Crée un fichier de configuration par défaut."""
+    def save_as_json(self, file_path: Path) -> None:
         default_data = {key: getattr(self, key) for key in vars(self)}
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(default_data, f, indent=4)
                 
-    def load_config_from_cli_args(self, args: list[str] = sys.argv[1:]) -> None:
-        """Modifie la configuration avec les arguments de ligne de commande."""
+    def load_from_cli_args(self, args: list[str] = sys.argv[1:]) -> None:
         for arg in args:
             if self._is_valid_arg(arg):
                 key, value = self._parse_arg(arg)

@@ -47,7 +47,7 @@ class Device:
     def load(config:Config)->list[Device]:
         devices:list[Device] = []
         try:
-            file_path = Path(config.devices_file)
+            file_path = Path(config.config_folder,config.devices_file)
             if not file_path.exists():
                 raise FileNotFoundError(f"Fichier {config.devices_file} introuvable")
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -81,7 +81,7 @@ class Device:
             data.append(item)
         if config.devices_file_out:
             try:
-                file_path = Path(config.devices_file_out)
+                file_path = Path(config.config_folder,config.devices_file_out)
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=4)
             except Exception as e:
