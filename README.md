@@ -303,13 +303,12 @@ The name of parameters is simply the name of the json fields, replacing `_` by `
 In `run-pynetwatch.bat`there is a sample launcher with those banal parameters :
 
 ```
-pyNetWatch.exe --config-file=%~dp0perso\config.json  --config-create=true --log-file=%~dp0perso\pynetwatch.log
+pyNetWatch.exe --config-file=%~dp0perso\config.json  --config-create=true --log-file=pynetwatch.log
 ```
-The idea is to change the pathname of the config file to force creation of the config file if missing and set the path of the log file...
+The idea is to change the pathname of the config file to force creation of the config file if missing and set the name of the log file...
 
 # TODO:
-* make devices.json path relative to config path
-* Find Todo
+* Find things to do
 
 # Disclaimer: 
 * I'm an old programmer (Java, C/C++, and many scripting languages), but a rookie in Python
