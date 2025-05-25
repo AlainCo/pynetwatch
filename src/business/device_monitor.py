@@ -88,14 +88,17 @@ class DeviceMonitor:
             except Exception:
                 i += 1
             finally:
-                if client is not None:
-                    client.close()
-                if stdin is not None:
-                    stdin.close()
-                if stdout is not None:
-                    stdout.close()
-                if stderr is not None:
-                    stderr.close()
+                try:
+                    if stdin is not None:
+                        stdin.close()
+                    if stdout is not None:
+                        stdout.close()
+                    if stderr is not None:
+                        stderr.close()
+                    if client is not None:
+                        client.close()
+                except Exception:
+                    pass
         else:
             return False
     
