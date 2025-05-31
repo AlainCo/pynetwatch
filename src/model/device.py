@@ -38,6 +38,11 @@ class Device:
         self.ssh_allow_agent:bool=True
         self.ssh_decelerate:float=1.0
         self.ssh_failed_accelerate:float=1.0
+        self.mount_folder:Optional[str]=None
+        self.mount_test_file:Optional[str]=None
+        self.mount_test_write:bool=False
+        
+        
         
         for attr in vars(config):
             if not attr.startswith('__') and hasattr(self, attr):

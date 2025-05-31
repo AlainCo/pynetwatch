@@ -5,6 +5,7 @@
 * It can test HTTP
 * it can runs SSH ans check patterns
 * SSH can be configured for obsolete ciphers (as my NAS is old)
+* it can check volume mounted locally, read or write file
 * It produce voice message when there are failures or when back to normal
 * GUI propose the list of device that are down
 * GUI propose to show the logs, which contain the history of up and down devices
@@ -19,6 +20,7 @@
 * check if my (old) NAS, and one of my OpenWRT router have mounted their disks
 * check if IPV6 connectivity is OK, as much as IPV4, pinging/getting google services, my box...
 * check if my company VPN site is up
+* check my mount of NAS volumes
 
 ## Internationalization :
 * you can change the voice language 
@@ -148,6 +150,10 @@ an example is in /samples/devices.json
 * `ssh_user_password` : SSH user password
 * `ssh_obsolete` : flag to prevent modern cryptographic algorithms, to work with old SSH servers
 
+### Mount
+* `mount_folder` : folder to be checked (checks it's a directory)
+* `mount_test-file`: file (relative to the `moount_folder` or absolute) to test for read or write
+* `mount_test_write` : flag whether we just test an open read on an existing file, or try to write an empty file
 
 # Building
 * first create a virtual environnement with `create-venv.bat`
@@ -303,6 +309,19 @@ Note also that SSH ciphers are set to normal (not `ssh_obsolete`)
 ```
 
 Here I check that the disk of my old NAS are well mounted. I have activated `ssh_obsolete` so the ciphers are old and recognized by this old NAS.
+
+### Checking a mounted volume on my PC
+```
+[
+    {
+        "name": "Freebox Disque 1",
+        "mount_folder": "M:\\",
+        "mount_test_file": "mount.testfile",
+        "mount_test_write": true,
+        "is_important": false
+    },
+]
+here I test that I can write on M: volume
 
 ## Launch pyNetWatch
 Then you have to launch `pyNetWatch.exe` generated in `dist\pyNetWatch.exe`

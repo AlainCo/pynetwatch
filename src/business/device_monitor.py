@@ -1,4 +1,3 @@
-from typing import Optional
 import requests
 import random
 import time
@@ -13,19 +12,20 @@ class DeviceMonitor:
     def __init__(self, device: Device):
         self.report=DeviceReport(device)
         self.device=device
+        self.previous_status=None
 
-    def check_ping(self,previous_status:Optional[bool]):
+    def check_ping(self):
         if self.device.ip is None:
             return False
         try:
             result = icmp_ping(self.device.ip, count=self.device.ping_count, timeout=self.device.ping_timeout, privileged=False)
             return result.packets_received > 0
         except Exception as e:
-            if previous_status is not False:
+            if self.previous_status is not False:
                     print(f"PING for '{self.device.name}' : exception {e}")
             return False
 
-    def check_url(self,previous_status:Optional[bool]):
+    def check_url(self):
         if self.device.url is None:
             return False
         i=0
@@ -34,13 +34,13 @@ class DeviceMonitor:
                 response = requests.get(url=self.device.url, timeout=self.device.http_timeout, verify=False,)
                 return response.status_code <500
             except requests.exceptions.RequestException as e:
-                if previous_status is not False:
+                if self.previous_status is not False:
                     print(f"HTTP for '{self.device.name}' : exception {e}")
                 i += 1
         else:
             return False
     
-    def check_ssh(self,previous_status:Optional[bool]):
+    def check_ssh(self):
         if self.device.ssh_host is None or self.device.ssh_user is None or self.device.ssh_command is None or self.device.ssh_key_file is None:
             return False
         i=0
@@ -92,7 +92,7 @@ class DeviceMonitor:
                         if not regex.search(text):
                             return False
                     except re.error:
-                        if previous_status is not False:
+                        if self.previous_status is not False:
                             print(f"SSH for '{self.device.name}' : invalid required regex '{pattern}' Ignored")
                 for pattern in self.device.ssh_pattern_forbiden:
                     try:
@@ -100,11 +100,11 @@ class DeviceMonitor:
                         if regex.search(text):
                             return False
                     except re.error:
-                        if previous_status is not False:
+                        if self.previous_status is not False:
                             print(f"SSH for '{self.device.name}' : invalid forbidden regex '{pattern}' Ignored")
                 return True
             except Exception as e:
-                if previous_status is not False:
+                if self.previous_status is not False:
                     print(f"SSH for '{self.device.name}' : exception {e}")
                 i += 1
             finally:
@@ -118,30 +118,59 @@ class DeviceMonitor:
                     if client is not None:
                         client.close()
                 except Exception as e:
-                    if previous_status is not False:
+                    if self.previous_status is not False:
                         print(f"SSH closing for '{self.device.name}' : exception {e}")
         else:
             return False
+    def check_mount(self):
+        if self.device.mount_folder is None:
+            return False
+        try:
+            mount_folder_path=Path(self.device.mount_folder)
+            result = mount_folder_path.is_dir(follow_symlinks=True)
+            if result and self.device.mount_test_file:
+                mount_test_file_path=Path(mount_folder_path,self.device.mount_test_file)
+                stream=None
+                try:
+                    if self.device.mount_test_write:
+                        stream=mount_test_file_path.open(mode="w")
+                        stream.flush()
+                    else:
+                        stream=mount_test_file_path.open(mode="r")
+                        stream.read(1)
+                finally:
+                    if stream:
+                        stream.close()
+                result=True
+            return result
+        except Exception as e:
+            if self.previous_status is not False:
+                    print(f"MOUNT for '{self.device.name}' : exception {e}")
+            return False
+
     
     def run_monitor(self,config:Config):
         #offset starting time to avoid bursts
+        self.report.current_status=None
         start_delay=random.uniform(0.0,self.device.interval/5)
         time.sleep(start_delay)
         while True:
             start_time:float = time.time()
         
-            previous_status = self.report.current_status
-            ok:bool = False
-            if self.device.ssh_host:
-                ok = self.check_ssh(previous_status)
-            if not ok and self.device.ip:
-                ok = self.check_ping(previous_status)
-            if not ok and self.device.url:
-                ok = self.check_url(previous_status)
+            self.previous_status = self.report.current_status
+            ok:bool = True
+            if self.device.mount_folder:
+                ok = self.check_mount()
+            if ok and self.device.ssh_host:
+                ok = self.check_ssh()
+            if ok and self.device.ip:
+                ok = self.check_ping()
+            if ok and self.device.url:
+                ok = self.check_url()
             self.report.current_status = ok
             
             # detect state change
-            if previous_status is None or previous_status != ok:
+            if self.previous_status is None or self.previous_status != ok:
                 if ok:
                     downtime_duration = time.time() - self.report.downtime_start if self.report.downtime_start else 0
                     if downtime_duration>0:
