@@ -1,3 +1,4 @@
+from typing import Optional
 import requests
 import random
 import time
@@ -13,16 +14,18 @@ class DeviceMonitor:
         self.report=DeviceReport(device)
         self.device=device
 
-    def check_ping(self):
+    def check_ping(self,previous_status:Optional[bool]):
         if self.device.ip is None:
             return False
         try:
             result = icmp_ping(self.device.ip, count=self.device.ping_count, timeout=self.device.ping_timeout, privileged=False)
             return result.packets_received > 0
-        except Exception:
+        except Exception as e:
+            if previous_status is not False:
+                    print(f"PING for '{self.device.name}' : exception {e}")
             return False
 
-    def check_url(self):
+    def check_url(self,previous_status:Optional[bool]):
         if self.device.url is None:
             return False
         i=0
@@ -30,12 +33,14 @@ class DeviceMonitor:
             try:
                 response = requests.get(url=self.device.url, timeout=self.device.http_timeout, verify=False,)
                 return response.status_code <500
-            except requests.exceptions.RequestException:
+            except requests.exceptions.RequestException as e:
+                if previous_status is not False:
+                    print(f"HTTP for '{self.device.name}' : exception {e}")
                 i += 1
         else:
             return False
     
-    def check_ssh(self):
+    def check_ssh(self,previous_status:Optional[bool]):
         if self.device.ssh_host is None or self.device.ssh_user is None or self.device.ssh_command is None or self.device.ssh_key_file is None:
             return False
         i=0
@@ -87,17 +92,20 @@ class DeviceMonitor:
                         if not regex.search(text):
                             return False
                     except re.error:
-                        print(f"Ignored: invalid regex : {pattern}")
+                        if previous_status is not False:
+                            print(f"SSH for '{self.device.name}' : invalid required regex '{pattern}' Ignored")
                 for pattern in self.device.ssh_pattern_forbiden:
                     try:
                         regex = re.compile(pattern,flags=0)
                         if regex.search(text):
                             return False
                     except re.error:
-                        print(f"Ignored: invalid regex : {pattern}")
+                        if previous_status is not False:
+                            print(f"SSH for '{self.device.name}' : invalid forbidden regex '{pattern}' Ignored")
                 return True
             except Exception as e:
-                print(f"SSH for {self.device.name} : exception {e}")
+                if previous_status is not False:
+                    print(f"SSH for '{self.device.name}' : exception {e}")
                 i += 1
             finally:
                 try:
@@ -109,8 +117,9 @@ class DeviceMonitor:
                         stderr.close()
                     if client is not None:
                         client.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    if previous_status is not False:
+                        print(f"SSH closing for '{self.device.name}' : exception {e}")
         else:
             return False
     
@@ -124,11 +133,11 @@ class DeviceMonitor:
             previous_status = self.report.current_status
             ok:bool = False
             if self.device.ssh_host:
-                ok = self.check_ssh()
-            if self.device.ip:
-                ok = self.check_ping()
+                ok = self.check_ssh(previous_status)
+            if not ok and self.device.ip:
+                ok = self.check_ping(previous_status)
             if not ok and self.device.url:
-                ok = self.check_url()
+                ok = self.check_url(previous_status)
             self.report.current_status = ok
             
             # detect state change
