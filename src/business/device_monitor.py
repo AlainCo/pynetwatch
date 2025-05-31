@@ -2,6 +2,7 @@ import requests
 import random
 import time
 from icmplib import ping as icmp_ping # type: ignore
+from pathlib import Path
 from model import Device,Config,DeviceReport
 import paramiko
 import re
@@ -42,6 +43,14 @@ class DeviceMonitor:
             client=None
             stdin, stdout, stderr=(None,None,None)
             try:
+                if self.device.ssh_key_folder:
+                    ssh_key_folder_path=Path(self.device.ssh_key_folder)
+                else:
+                    ssh_key_folder_path=self.device.config_folder
+                if self.device.ssh_key_file:
+                    ssh_key_file_path=Path(ssh_key_folder_path,self.device.ssh_key_file )
+                else:
+                    ssh_key_file_path=None
                 client = paramiko.SSHClient()
                 # automatically add host key. use with precaution.
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -57,11 +66,13 @@ class DeviceMonitor:
                 client.connect(
                     hostname=self.device.ssh_host,
                     username=self.device.ssh_user,
-                    key_filename =self.device.ssh_key_file,
+                    key_filename =str(ssh_key_file_path),
                     passphrase=self.device.ssh_key_password,
                     gss_auth=False,
                     gss_kex=False,
                     compress=True,
+                    allow_agent=self.device.ssh_allow_agent,
+                    password=self.device.ssh_user_password,
                     disabled_algorithms=disabled_algorithms,
                     timeout=self.device.ssh_timeout
                 )
@@ -85,7 +96,8 @@ class DeviceMonitor:
                     except re.error:
                         print(f"Ignored: invalid regex : {pattern}")
                 return True
-            except Exception:
+            except Exception as e:
+                print(f"SSH for {self.device.name} : exception {e}")
                 i += 1
             finally:
                 try:

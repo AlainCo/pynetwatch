@@ -88,9 +88,13 @@ In my case those `speech_voice` selectors would have worked:
 * `http_timeout` : maximum time for HTTP requests
 * `ssh_retry` : number of tries for SSH request
 * `ssh_timeout` : maximum time for HTTP requests
-* `ssh_key_file` : SSH key file to use
+* `ssh_key_folder` : base folder for ssh keys
+* `ssh_key_file` : SSH key file to use (relative to `ssh_key_folder` or absolute)
 * `ssh_key_password` : SSH key password
-* `ssh_obsolete` : flag to prevent modern cryptographic algorithms, to work with old SSH servers
+* `ssh_allow_agent` : flag to allow SSH key agent (like pageant) or not (true by default)
+* `ssh_user` : SSH user login
+* `ssh_user_password` : SSH user password
+* `ssh_obsolete` : flag to prevent modern cryptographic algorithms, to work with old SSH servers (false by default)
 
 
 ### Overloading via command line arguments
@@ -134,11 +138,14 @@ an example is in /samples/devices.json
 * `ssh_command` : SSH Command
 * `ssh_pattern_required` : array of string with regex patterns that are all required
 * `ssh_pattern_forbiden` : array of string with regex patterns that are each forbidden
-* `ssh_retry` : 
 * `ssh_retry` : number of tries for SSH request
 * `ssh_timeout` : maximum time for HTTP requests
-* `ssh_key_file` : SSH key file to use
+* `ssh_key_folder` : base folder for ssh keys
+* `ssh_key_file` : SSH key file to use (relative to `ssh_key_folder` or absolute)
 * `ssh_key_password` : SSH key password
+* `ssh_allow_agent` : flag to allow SSH key agent (like pageant) or not (true by default)
+* `ssh_user` : SSH user login
+* `ssh_user_password` : SSH user password
 * `ssh_obsolete` : flag to prevent modern cryptographic algorithms, to work with old SSH servers
 
 
@@ -266,7 +273,8 @@ It's easy to test Internet connectivity, in IPV4 and IPV6. Note that I reduce th
 Here I use  SSH command to check is my 2 Wifi radio interfaces are up.
 I use the default values from config.json:
 ```
-    "ssh_key_file":"C:\\Users\\me`\mysshkey.ppk",
+    "ssh_key_folder":"C:\\Users\\me\\",
+    "ssh_key_file":"mysshkey.opensshkey",
     "ssh_key_password":"mypassword",
     "ssh_retry":2,
     "ssh_timeout":10,

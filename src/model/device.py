@@ -12,6 +12,7 @@ class Device:
         config: Config
     ):
         self.name:str=""
+        self.config_folder=Path(".")
         self.ip: Optional[str] =None
         self.url: Optional[str] =None
         self.is_important: bool=False
@@ -23,6 +24,7 @@ class Device:
         self.accelerate:float=1.0
         self.failed_accelerate:float=1.0
         self.ssh_key_file:Optional[str]=None
+        self.ssh_key_folder:Optional[str]=None
         self.ssh_key_password:Optional[str]=None
         self.ssh_host:Optional[str]=None
         self.ssh_user:Optional[str]=None
@@ -31,8 +33,9 @@ class Device:
         self.ssh_pattern_forbiden:list[str]=[]
         self.ssh_retry:int=1
         self.ssh_timeout:int=1
-        self.ssh_user_password:Optional[int]=None
+        self.ssh_user_password:Optional[str]=None
         self.ssh_obsolete:bool=False
+        self.ssh_allow_agent:bool=True
         self.ssh_decelerate:float=1.0
         self.ssh_failed_accelerate:float=1.0
         

@@ -38,8 +38,12 @@ class Config:
         self.ping_timeout = 1
         self.http_timeout = 3
         self.http_retry = 2
-        self.ssh_key_file='ssh.key'
-        self.ssh_key_password='password'
+        self.ssh_key_folder=None
+        self.ssh_key_file=None
+        self.ssh_key_password=None
+        self.ssh_allow_agent=True,
+        self.ssh_user=None
+        self.ssh_user_password=None
         self.ssh_retry=1
         self.ssh_timeout=10
         self.ssh_decelerate=10.0
