@@ -86,11 +86,14 @@ class DeviceMonitor:
                 stdout_text=stdout.read().decode()
                 stderr_text=stderr.read().decode()
                 text=f"{stdout_text}\n{stderr_text}"
+                ok=True
                 for pattern in self.device.ssh_pattern_required:
                     try:
                         regex = re.compile(pattern,flags=0)
                         if not regex.search(text):
-                            return False
+                            if self.previous_status is not False:
+                                print(f"SSH for '{self.device.name}' : not found required regex '{pattern}' Failed")
+                            ok=False
                     except re.error:
                         if self.previous_status is not False:
                             print(f"SSH for '{self.device.name}' : invalid required regex '{pattern}' Ignored")
@@ -98,11 +101,13 @@ class DeviceMonitor:
                     try:
                         regex = re.compile(pattern,flags=0)
                         if regex.search(text):
-                            return False
+                            if self.previous_status is not False:
+                                print(f"SSH for '{self.device.name}' : found forbidden regex '{pattern}' Failed")
+                            ok=False
                     except re.error:
                         if self.previous_status is not False:
                             print(f"SSH for '{self.device.name}' : invalid forbidden regex '{pattern}' Ignored")
-                return True
+                return ok
             except Exception as e:
                 if self.previous_status is not False:
                     print(f"SSH for '{self.device.name}' : exception {e}")
