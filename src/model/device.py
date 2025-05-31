@@ -12,7 +12,7 @@ class Device:
         config: Config
     ):
         self.name:str=""
-        self.config_folder=Path(".")
+        self.config_folder="."
         self.ip: Optional[str] =None
         self.url: Optional[str] =None
         self.is_important: bool=False

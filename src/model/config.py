@@ -63,7 +63,7 @@ class Config:
         
     def load_from_json(self, filename:str) -> None:
         file_path = Path(filename)
-        self.config_folder=file_path.parent
+        self.config_folder=str(file_path.parent)
         # create config file if not exist and "config_create"  is true
         if not file_path.exists():
             if self.config_create:
