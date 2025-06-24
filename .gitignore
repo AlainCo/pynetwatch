@@ -4,7 +4,7 @@ venv/
 __pycache__/
 
 # Fichiers générés par l'IDE
-.vscode/
+#.vscode/#keep vscode config
 .idea/
 
 # Fichiers temporaires
