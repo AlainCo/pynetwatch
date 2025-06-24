@@ -6,7 +6,25 @@
         "ms-python.autopep8",
         "njpwerner.autodocstring",
         "donjayamanne.git-extension-pack",
+        "donjayamanne.githistory",
+        "codezombiech.gitignore",
         "eamodio.gitlens",
-        "eriklynd.json-tools"
+        "eriklynd.json-tools",
+        "ms-python.vscode-pylance",
+        "ms-python.python",
+        "ms-python.debugpy",
+        "demystifying-javascript.python-extensions-pack",
+        "donjayamanne.python-extension-pack",
+        "kevinrose.vsc-python-indent",
+        "kaih2o.python-resource-monitor",
+        "littlefoxteam.vscode-python-test-adapter",
+        "njqdev.vscode-python-typehint",
+        "cstrap.python-snippets",
+        "hbenl.vscode-test-explorer",
+        "trabpukcip.wolf",
+        "almenon.arepl",
+        "njpwerner.autodocstring",
+        "streetsidesoftware.code-spell-checker",
+        "ms-python.autopep8"
     ]
 }
