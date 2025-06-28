@@ -135,6 +135,7 @@ an example is in /samples/devices.json
 
 * `name` : name of the device, for GUI, log and speech
 * `is_important` : flag to tell that this devices is important
+* `is_disabled` : flag to tell that this devices is ignored
 
 #### Changing interval
 
@@ -393,9 +394,11 @@ pyNetWatch.exe --config-file=%~dp0perso\config.json  --config-create=true --log-
 
 The idea is to change the pathname of the config file to force creation of the config file if missing and set the name of the log file...
 
-## TODO:
+## TODO
 
 * Find things to do
+* Launch local command (like `ipconfig /renew`) , or ssh command (like `mount -a`), or url GET if failing (once)
+* Create the concept of "state" (like: my box is down, I'm at work, on my travel router, on VPN ), triggered manually, or via detection of failure/success. introduce concept of "ignore" so that no alert is raised if down, but it can change state. add field to ignore or disable if/if not a state. add GUI to check/uncheck state. add config to list allowed states.
 
 ## Disclaimer
 

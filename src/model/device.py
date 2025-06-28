@@ -16,6 +16,7 @@ class Device:
         self.ip: Optional[str] =None
         self.url: Optional[str] =None
         self.is_important: bool=False
+        self.is_disabled:bool=False
         self.interval :float=10.0
         self.ping_count :int=1
         self.ping_timeout :int=1
